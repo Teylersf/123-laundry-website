@@ -33,7 +33,7 @@ export default function HomePage() {
             sizes="100vw"
             className="object-cover opacity-50"
           />
-          <div className="absolute inset-0 bg-linear-to-b from-ink/60 via-ink/50 to-ink/85" />
+          <div className="absolute inset-0 bg-linear-to-b from-ink/75 via-ink/70 to-ink/90" />
         </div>
         <div className="relative mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-32">
           <Pill>Locally owned · Deer Park &amp; Spokane Valley</Pill>

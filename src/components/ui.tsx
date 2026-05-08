@@ -120,10 +120,10 @@ export function Pill({ children }: { children: ReactNode }) {
 export function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="font-display text-3xl font-extrabold text-brand md:text-4xl">
+      <div className="font-display text-3xl font-extrabold text-brand-200 drop-shadow-md md:text-4xl">
         {value}
       </div>
-      <div className="mt-1 text-sm text-ink/70">{label}</div>
+      <div className="mt-1 text-sm font-medium opacity-90">{label}</div>
     </div>
   );
 }

@@ -18,20 +18,20 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur supports-[backdrop-filter]:bg-paper/70">
+    <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur supports-backdrop-filter:bg-paper/70">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 md:px-6">
         <Link
           href="/"
           aria-label="123 Laundry — home"
-          className="flex items-center gap-2"
+          className="-my-1.5 flex items-center gap-2 md:-my-2"
         >
           <Image
             src="/images/logo.png"
             alt="123 Laundry logo"
-            width={140}
-            height={84}
+            width={200}
+            height={120}
             priority
-            className="h-10 w-auto md:h-12"
+            className="h-13 w-auto md:h-15"
           />
           <span className="sr-only">{BUSINESS.name}</span>
         </Link>
