@@ -17,7 +17,10 @@ export type SimulatedLocationSnapshot = LocationSnapshot & {
   simulated: true;
 };
 
-// Real machine layouts at each store, observed from the LaundryCat portal.
+// Real machine layouts. Only Spokane Valley is on the LaundryCat account
+// today, so that's the only location we render in the live-status block —
+// matching what production looks like once the relay is feeding data.
+// Deer Park's machines aren't reported by the portal yet.
 const FLOOR_PLANS: Record<
   string,
   { label: string; locationId: string; washers: string[]; dryers: string[] }
@@ -27,14 +30,6 @@ const FLOOR_PLANS: Record<
     locationId: "0100002",
     washers: range("W", 26, 47),
     dryers: range("D", 1, 25),
-  },
-  "deer-park": {
-    label: "22 South Vernon Avenue, Deer Park, WA",
-    // We don't have an authenticated read of the Deer Park account yet;
-    // approximate counts mirror what the storefront shows.
-    locationId: "0100001",
-    washers: range("W", 1, 18),
-    dryers: range("D", 1, 18),
   },
 };
 
