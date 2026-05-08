@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Brand tokens — pulled directly from 123-laundry.com.
+   Primary teal #118fab is the original site's <meta name="theme-color">. */
+@theme {
+  --color-brand: #118fab;
+  --color-brand-50: #e7f6f9;
+  --color-brand-100: #b9e3ec;
+  --color-brand-200: #87d0e0;
+  --color-brand-300: #54bcd2;
+  --color-brand-400: #2da6c1;
+  --color-brand-500: #118fab;
+  --color-brand-600: #0e7c95;
+  --color-brand-700: #0b6479;
+  --color-brand-800: #084a5a;
+  --color-brand-900: #053341;
+  --color-brand-950: #021c25;
+
+  --color-ink: #0a0a0a;
+  --color-ink-soft: #1a1a1a;
+  --color-paper: #ffffff;
+  --color-paper-soft: #f7fbfc;
+  --color-line: #e5edf0;
+
+  --font-sans:
+    "Source Sans 3", "Source Sans Pro", ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  --font-display:
+    "Montserrat", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "kern", "liga", "calt";
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Subtle dotted background pattern for "card" sections */
+.bg-grid {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--color-brand) 22%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 22px 22px;
+}
+
+/* Diagonal stripe section divider */
+.diag-divider {
+  background: linear-gradient(
+    135deg,
+    transparent 0,
+    transparent 49%,
+    color-mix(in oklab, var(--color-brand) 18%, transparent) 49%,
+    color-mix(in oklab, var(--color-brand) 18%, transparent) 51%,
+    transparent 51%,
+    transparent 100%
+  );
+}
+
+/* Smooth focus ring on the brand */
+:where(a, button, [role="button"]):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reduced motion-friendly transitions */
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  button {
+    transition:
+      color 120ms ease,
+      background-color 160ms ease,
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
 }

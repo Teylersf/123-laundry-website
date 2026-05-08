@@ -1,0 +1,118 @@
+import type { Metadata } from "next";
+import {
+  Section,
+  SectionEyebrow,
+  SectionHeading,
+  Button,
+  Card,
+  Breadcrumbs,
+} from "@/components/ui";
+import { BUSINESS } from "@/lib/site-data";
+
+export const metadata: Metadata = {
+  title: "How It Works — Card-Based Laundromat, No Quarters",
+  description:
+    "Step-by-step: how the 123 Laundry card system works. Touch-screen kiosks, reloadable cards, tap-to-start washers and dryers. Manage your card via LaundryCat.",
+  alternates: { canonical: "/how-it-works" },
+};
+
+const STEPS = [
+  {
+    n: "1",
+    title: "Walk up to a kiosk",
+    body: "Each store has a touch-screen kiosk near the entrance. It's roughly as easy to use as an ATM. The first time, our on-site attendant can walk you through it.",
+  },
+  {
+    n: "2",
+    title: "Load any amount onto a card",
+    body: "Insert a debit or credit card and load whatever amount you'd like onto a 123 Laundry card. The kiosk will issue you a card on the spot — keep it for next time.",
+  },
+  {
+    n: "3",
+    title: "Pick a washer, tap your card",
+    body: "Choose your washer (regular or extra-large), tap your 123 Laundry card on the reader, and the machine starts. Add detergent, close the door, and you're going.",
+  },
+  {
+    n: "4",
+    title: "Move to a dryer, tap again",
+    body: "When the wash cycle is done, transfer your load to a dryer, tap your card, choose your dry time. Easy.",
+  },
+  {
+    n: "5",
+    title: "Fold and head out",
+    body: "Plenty of folding-table space. Bring your basket, fold up, and head out. Whatever balance is left on your card stays there for next time.",
+  },
+  {
+    n: "★",
+    title: "Get a text when it's done",
+    body: "Opt in at the kiosk and we'll text you when your washer finishes — and again when your dryer is done. Run errands or grab a coffee; we'll let you know when it's time to come back.",
+  },
+];
+
+export default function HowItWorksPage() {
+  return (
+    <>
+      <Section className="bg-paper-soft">
+        <Breadcrumbs trail={[{ label: "Home", href: "/" }, { label: "How It Works" }]} />
+        <SectionEyebrow>{BUSINESS.tagline}</SectionEyebrow>
+        <SectionHeading level={1}>How the card system works.</SectionHeading>
+        <p className="mt-6 max-w-3xl text-lg text-ink/75">
+          123 Laundry is 100% card-based. There are no coin slots in the
+          building. Here's exactly what to expect on your first visit.
+        </p>
+      </Section>
+
+      <Section>
+        <ol className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {STEPS.map((s) => (
+            <li key={s.n} className="list-none">
+              <Card>
+                <div className="font-display text-5xl font-black text-brand">{s.n}</div>
+                <h2 className="mt-2 font-display text-xl font-bold">{s.title}</h2>
+                <p className="mt-3 text-ink/75">{s.body}</p>
+              </Card>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      <Section className="bg-paper-soft">
+        <SectionEyebrow>Card management</SectionEyebrow>
+        <SectionHeading>Check your balance and reload online.</SectionHeading>
+        <p className="mt-4 max-w-3xl text-ink/75">
+          We use LaundryCat for card management. You can check your balance,
+          reload your card with a credit/debit card, and view recent transactions
+          — anytime, from your phone or computer.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Button href={BUSINESS.cardBalanceUrl} external>
+            Open LaundryCat balance portal
+          </Button>
+          <Button href="/check-balance" variant="ghost">
+            More about LaundryCat
+          </Button>
+        </div>
+      </Section>
+
+      <Section>
+        <SectionEyebrow>Quick tips</SectionEyebrow>
+        <SectionHeading>Five things first-timers love to know.</SectionHeading>
+        <div className="mt-8 grid gap-5 md:grid-cols-2">
+          {[
+            ["You don't have to commit to a big balance.", "The kiosk lets you load whatever amount makes sense for the loads you're doing today."],
+            ["Lost cards.", "Tell our attendant or call us — we can help look up your account and transfer the balance."],
+            ["The card never expires.", "Keep it in your laundry basket for next time. Whatever balance you didn't use is still there."],
+            ["Bring detergent or buy on site.", "Use what you love at home, or grab single-load detergent and dryer sheets from our vending area."],
+            ["Watch for the load-completion light.", "Each machine signals when it's done. Be considerate of the next customer and unload promptly."],
+            ["Last load goes in at 8 PM.", "Doors close at 9 PM. Plan your start time around that — no one likes being rushed."],
+          ].map(([title, body]) => (
+            <Card key={title}>
+              <h3 className="font-display text-base font-bold">{title}</h3>
+              <p className="mt-2 text-sm text-ink/75">{body}</p>
+            </Card>
+          ))}
+        </div>
+      </Section>
+    </>
+  );
+}
