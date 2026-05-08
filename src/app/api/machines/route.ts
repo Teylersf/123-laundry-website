@@ -14,16 +14,39 @@ export const dynamic = "force-dynamic";
 const KNOWN_SLUGS = ["spokane-valley", "deer-park"] as const;
 
 export async function GET() {
-  const [lastSyncAt, lastSyncOk, lastError, ...snapshots] = await Promise.all([
-    kv.get<string>(KV_KEYS.lastSyncAt),
-    kv.get<string>(KV_KEYS.lastSyncOk),
-    kv.get<{ at: string; reason: string; detail: string | null }>(
-      KV_KEYS.lastSyncError,
-    ),
-    ...KNOWN_SLUGS.map((slug) =>
-      kv.get<LocationSnapshot>(KV_KEYS.snapshot(slug)),
-    ),
-  ]);
+  // The KV layer is backed by Postgres. In environments where DATABASE_URL
+  // isn't set yet (e.g. the first prod deploy before we provision a hosted
+  // DB), we don't want the route to 500 — we just gracefully fall through to
+  // the simulated snapshot below.
+  let lastSyncAt: string | null = null;
+  let lastSyncOk: string | null = null;
+  let lastError: { at: string; reason: string; detail: string | null } | null =
+    null;
+  let snapshots: (LocationSnapshot | null)[] = KNOWN_SLUGS.map(() => null);
+  try {
+    const results = await Promise.all([
+      kv.get<string>(KV_KEYS.lastSyncAt),
+      kv.get<string>(KV_KEYS.lastSyncOk),
+      kv.get<{ at: string; reason: string; detail: string | null }>(
+        KV_KEYS.lastSyncError,
+      ),
+      ...KNOWN_SLUGS.map((slug) =>
+        kv.get<LocationSnapshot>(KV_KEYS.snapshot(slug)),
+      ),
+    ]);
+    lastSyncAt = (results[0] as string | null) ?? null;
+    lastSyncOk = (results[1] as string | null) ?? null;
+    lastError =
+      (results[2] as {
+        at: string;
+        reason: string;
+        detail: string | null;
+      } | null) ?? null;
+    snapshots = results.slice(3) as (LocationSnapshot | null)[];
+  } catch {
+    // Postgres unreachable — fall through with empty data, the simulated
+    // snapshot below keeps the homepage looking alive.
+  }
 
   type Entry = {
     slug: (typeof KNOWN_SLUGS)[number];
