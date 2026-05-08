@@ -38,7 +38,8 @@ export function LocalBusinessJsonLd() {
       },
     ],
     priceRange: "$",
-    paymentAccepted: "Reloadable laundry card (no cash, no coins)",
+    paymentAccepted: "Cash, EBT, debit card, credit card, Apple Pay, Google Pay (loaded onto a reloadable 123 Laundry card)",
+    currenciesAccepted: "USD",
     sameAs: [BUSINESS.social.facebook, BUSINESS.social.instagram],
     additionalProperty: [
       { "@type": "PropertyValue", name: "Wi-Fi", value: "Free customer Wi-Fi" },

@@ -7,7 +7,7 @@ import {
   Button,
   Breadcrumbs,
 } from "@/components/ui";
-import { BUSINESS, LOCATION_LIST } from "@/lib/site-data";
+import { BUSINESS, LOCATION_LIST, PAYMENT_METHODS } from "@/lib/site-data";
 
 export const metadata: Metadata = {
   title: "Pricing — How Payment Works at 123 Laundry",
@@ -30,7 +30,27 @@ export default function PricingPage() {
         </p>
       </Section>
 
-      <Section>
+      <Section className="pt-0!">
+        <Card className="bg-brand-50/60">
+          <h2 className="font-display text-xl font-bold">We take whatever you have on you.</h2>
+          <p className="mt-2 text-ink/75">
+            Our kiosks accept cash, EBT, debit and credit cards, plus contactless phone tap pay (Apple Pay and Google Pay).
+          </p>
+          <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {PAYMENT_METHODS.map((p) => (
+              <li
+                key={p.name}
+                className="rounded-2xl border border-brand-200/70 bg-paper p-4"
+              >
+                <div className="font-display text-base font-bold text-brand-700">{p.name}</div>
+                <p className="mt-1 text-sm text-ink/75">{p.blurb}</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </Section>
+
+      <Section className="pt-0!">
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <h2 className="font-display text-xl font-bold">Loading your card</h2>

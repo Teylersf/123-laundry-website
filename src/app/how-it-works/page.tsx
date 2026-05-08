@@ -7,7 +7,7 @@ import {
   Card,
   Breadcrumbs,
 } from "@/components/ui";
-import { BUSINESS } from "@/lib/site-data";
+import { BUSINESS, PAYMENT_METHODS } from "@/lib/site-data";
 
 export const metadata: Metadata = {
   title: "How It Works — Card-Based Laundromat, No Quarters",
@@ -74,6 +74,28 @@ export default function HowItWorksPage() {
             </li>
           ))}
         </ol>
+      </Section>
+
+      <Section>
+        <SectionEyebrow>Payment</SectionEyebrow>
+        <SectionHeading>Cash, EBT, card, or just tap your phone.</SectionHeading>
+        <p className="mt-4 max-w-3xl text-ink/75">
+          The kiosk doesn't care how you pay — whatever you have on you, we'll
+          take it and put it on your laundry card.
+        </p>
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {PAYMENT_METHODS.map((p) => (
+            <li
+              key={p.name}
+              className="rounded-2xl border border-line bg-paper-soft p-5"
+            >
+              <div className="font-display text-base font-bold text-brand-700">
+                {p.name}
+              </div>
+              <p className="mt-1 text-sm text-ink/75">{p.blurb}</p>
+            </li>
+          ))}
+        </ul>
       </Section>
 
       <Section className="bg-paper-soft">

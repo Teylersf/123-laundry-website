@@ -169,7 +169,7 @@ export default async function LocationPage(
                 <div>
                   <dt className="text-ink/60">Payment</dt>
                   <dd className="font-medium">
-                    Reloadable 123 Laundry card — no cash, no coins
+                    Cash, EBT, debit/credit, or phone tap pay — all load onto a reloadable 123 Laundry card
                   </dd>
                 </div>
               </dl>

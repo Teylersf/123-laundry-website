@@ -1,0 +1,28 @@
+// Schema for the LaundryCat live-status pipeline.
+//
+// We deliberately keep this tiny — two tables that act as a key/value store
+// for (a) the auto-renewing LaundryCat session cookie and (b) the most
+// recent machine-status snapshot per location, plus a generic kv table for
+// cron heartbeats and last-error breadcrumbs. When we move to managed
+// Postgres later the schema travels with us unchanged.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Generic single-row-per-key cache. We use one table for everything (sessions,
+// snapshots, sync metadata) so the storage adapter stays trivial.
+model KvEntry {
+  key       String   @id
+  value     Json
+  expiresAt DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@map("kv_entries")
+}

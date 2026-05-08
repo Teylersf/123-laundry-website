@@ -36,6 +36,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# laundrycat relay daemon — local browser profile, never commit
+/.laundrycat-relay-profile/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

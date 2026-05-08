@@ -9,6 +9,7 @@ import {
   Pill,
 } from "@/components/ui";
 import { Icon } from "@/components/feature-icon";
+import { LiveMachineStatus } from "@/components/live-machine-status";
 import {
   AMENITIES,
   BUSINESS,
@@ -66,6 +67,9 @@ export default function HomePage() {
           </p>
         </div>
       </section>
+
+      {/* LIVE MACHINE STATUS — pulled from LaundryCat every 5 minutes */}
+      <LiveMachineStatus />
 
       {/* OWNER-PRIORITY FEATURE STRIP — must stay above the fold-ish */}
       <section

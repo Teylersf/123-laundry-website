@@ -128,6 +128,27 @@ export const LOCATION_LIST: Location[] = [
   LOCATIONS["spokane-valley"],
 ];
 
+// Payment methods accepted at the kiosks. The 123 Laundry card is reloadable
+// from any of these — cash, EBT, debit/credit, and contactless phone tap pay.
+export const PAYMENT_METHODS = [
+  {
+    name: "Cash",
+    blurb: "Bills go straight into the kiosk — no minimum, no card needed at all.",
+  },
+  {
+    name: "EBT",
+    blurb: "We accept EBT at the kiosk to load value onto your laundry card.",
+  },
+  {
+    name: "Debit & credit",
+    blurb: "Tap, swipe, or insert any major debit or credit card.",
+  },
+  {
+    name: "Phone tap (Apple Pay / Google Pay)",
+    blurb: "Hold your phone or smart watch to the kiosk reader and you're done.",
+  },
+];
+
 // Eight headline features the owner wants front-and-center on the homepage.
 // Each is real and verifiable in-store. Keep this list short — it powers the
 // hero strip and is the single place to update if a feature changes.
@@ -560,6 +581,10 @@ export const FAQ = [
   {
     q: "Do I need quarters?",
     a: "No. Both 123 Laundry locations are 100% card-based. You'll load any amount onto a reloadable 123 Laundry card at our touch-screen kiosk, then tap your card on a washer or dryer to start it. There are no coin slots in the building.",
+  },
+  {
+    q: "What payment methods do you accept?",
+    a: "Our kiosks accept cash, EBT, debit and credit cards, and contactless phone tap pay (Apple Pay and Google Pay). Whatever you have on you, we'll take it — and load it onto your reloadable 123 Laundry card.",
   },
   {
     q: "When are you open?",
