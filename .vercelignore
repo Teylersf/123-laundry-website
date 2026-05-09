@@ -1,0 +1,9 @@
+# LaundryCat relay's persistent Chromium profile — local-only, contains
+# auth state and is locked by the running browser.
+.laundrycat-relay-profile/
+
+# Large local-only artifacts
+.next/
+node_modules/
+.git/
+.env*
