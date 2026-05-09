@@ -1,28 +1,27 @@
 #!/usr/bin/env node
 /**
- * 123 Laundry · LaundryCat session relay (local daemon)
+ * 123 Laundry · LaundryCat live-data relay (persistent window)
  *
- * Runs a real Chromium instance with a persistent profile, navigates to
- * https://www.laundrycat.com/availability, captures the laravel_session
- * cookie, and POSTs it to our /api/laundrycat/session webhook so the
- * homepage can show live machine status.
+ * Opens a real Chromium window once, navigates to the LaundryCat
+ * "Machine Availability" page, waits for the owner to sign in (one human
+ * check, ever), then **never closes the window**. Inside the page context
+ * we re-call the portal's own `/machines` JSON endpoint every 60 seconds —
+ * which both keeps the Laravel session alive forever AND captures the
+ * freshest data — and POST that JSON straight to our snapshot ingest
+ * endpoint.
  *
- * Usage:
- *   npm run laundrycat:relay
+ * Run once with `npm run laundrycat:relay`, click the human-check, then
+ * minimize the window. As long as that window is alive, the homepage
+ * shows live data.
  *
- * The first run opens a visible Chromium window. The owner signs in
- * manually (passes the human check once). After that the profile has the
- * trust signals and subsequent runs sail through invisibly.
- *
- * Loops on LAUNDRYCAT_RELAY_INTERVAL_MIN (default 30) until stopped.
- *
- * Env (read from .env.local in the project root):
- *   LAUNDRYCAT_RELAY_WEBHOOK    where to POST the cookie
- *                               default: http://localhost:3000/api/laundrycat/session
- *   ADMIN_INGEST_TOKEN          must match the server's ADMIN_INGEST_TOKEN
- *   LAUNDRYCAT_RELAY_INTERVAL_MIN  default: 30
- *   LAUNDRYCAT_RELAY_HEADLESS   "true" to run headless after the first login
- *   LAUNDRYCAT_RELAY_CHANNEL    "chrome" (default) or "chromium"
+ * Env (.env.local):
+ *   ADMIN_INGEST_TOKEN              required — must match server
+ *   LAUNDRYCAT_RELAY_WEBHOOK        snapshot endpoint
+ *                                   (default: http://localhost:3000/api/laundrycat/snapshot)
+ *   LAUNDRYCAT_RELAY_INTERVAL_SEC   default: 60
+ *   LAUNDRYCAT_RELAY_CHANNEL        "chrome" (default) or "chromium"
+ *   LAUNDRYCAT_RELAY_HEADLESS       "true" to run headless after first login
+ *   LAUNDRYCAT_RELAY_PROFILE_DIR    where to keep the Chromium profile
  */
 import { chromium } from "playwright";
 import { readFileSync, mkdirSync, existsSync } from "node:fs";
@@ -33,7 +32,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, "..");
 
-// ----- env loader (tiny, dependency-free) ------------------------------------
+// ----- env loader (dependency-free) -----------------------------------------
 function loadEnv() {
   const candidates = [
     path.join(ROOT, ".env.local"),
@@ -56,7 +55,6 @@ function loadEnv() {
       ) {
         value = value.slice(1, -1);
       }
-      // .env loader precedence: .env.local first wins.
       if (out[key] === undefined) out[key] = value;
     }
   }
@@ -65,15 +63,11 @@ function loadEnv() {
 const env = { ...loadEnv(), ...process.env };
 
 const WEBHOOK =
-  env.LAUNDRYCAT_RELAY_WEBHOOK ?? "http://localhost:3000/api/laundrycat/session";
+  env.LAUNDRYCAT_RELAY_WEBHOOK ?? "http://localhost:3000/api/laundrycat/snapshot";
 const TOKEN = env.ADMIN_INGEST_TOKEN;
-const INTERVAL_MIN = Number(env.LAUNDRYCAT_RELAY_INTERVAL_MIN) || 30;
-const INTERVAL_MS = INTERVAL_MIN * 60_000;
+const INTERVAL_SEC = Number(env.LAUNDRYCAT_RELAY_INTERVAL_SEC) || 60;
 const CHANNEL = env.LAUNDRYCAT_RELAY_CHANNEL ?? "chrome";
-// On the first launch the profile is empty, so we need a window for the
-// human check. Once that's done, you can flip LAUNDRYCAT_RELAY_HEADLESS=true.
 const HEADLESS = env.LAUNDRYCAT_RELAY_HEADLESS === "true";
-
 const PROFILE_DIR =
   env.LAUNDRYCAT_RELAY_PROFILE_DIR ??
   path.join(ROOT, ".laundrycat-relay-profile");
@@ -89,21 +83,31 @@ const C = {
   cyan: "\x1b[36m",
   bold: "\x1b[1m",
 };
-function ts() {
-  return `${C.dim}${new Date().toISOString().replace("T", " ").slice(0, 19)}${C.reset}`;
-}
-function log(...args) { console.log(ts(), ...args); }
-function ok(...args)  { console.log(ts(), C.green + "✓" + C.reset, ...args); }
-function warn(...args){ console.log(ts(), C.yellow + "!" + C.reset, ...args); }
-function err(...args) { console.log(ts(), C.red + "×" + C.reset, ...args); }
+const stamp = () =>
+  `${C.dim}${new Date().toISOString().replace("T", " ").slice(0, 19)}${C.reset}`;
+const log = (...a) => console.log(stamp(), ...a);
+const ok = (...a) => console.log(stamp(), C.green + "✓" + C.reset, ...a);
+const warn = (...a) => console.log(stamp(), C.yellow + "!" + C.reset, ...a);
+const err = (...a) => console.log(stamp(), C.red + "×" + C.reset, ...a);
 
-// ----- one refresh cycle -----------------------------------------------------
-async function refreshOnce() {
+// ----- main ------------------------------------------------------------------
+async function main() {
+  console.log("");
+  console.log(`${C.bold}${C.cyan}123 Laundry · live-data relay${C.reset}`);
+  console.log(`  webhook:        ${WEBHOOK}`);
+  console.log(`  poll interval:  every ${INTERVAL_SEC}s`);
+  console.log(`  browser:        ${CHANNEL}${HEADLESS ? " (headless)" : " (headed)"}`);
+  console.log(`  profile dir:    ${PROFILE_DIR}`);
+  console.log("");
+  console.log(
+    `${C.dim}Sign in once when the window opens — after that the script keeps the page alive forever and ships fresh machine data to your site every ${INTERVAL_SEC}s. Don't close the window.${C.reset}`,
+  );
+  console.log(`${C.dim}Press Ctrl+C to stop.${C.reset}`);
+  console.log("");
+
   if (!TOKEN) {
-    err(
-      "ADMIN_INGEST_TOKEN is not set in .env.local — copy it from your Vercel/local env and rerun.",
-    );
-    return false;
+    err("ADMIN_INGEST_TOKEN missing in .env.local — aborting.");
+    process.exit(1);
   }
 
   log(`launching ${HEADLESS ? "headless" : "headed"} ${CHANNEL}…`);
@@ -124,117 +128,148 @@ async function refreshOnce() {
   } catch (e) {
     err("could not launch browser:", e?.message ?? e);
     if (CHANNEL === "chrome") {
-      warn("retrying with the bundled chromium binary…");
-      try {
-        context = await chromium.launchPersistentContext(PROFILE_DIR, {
+      warn("retrying with bundled chromium…");
+      context = await chromium
+        .launchPersistentContext(PROFILE_DIR, {
           headless: HEADLESS,
-          args: [
-            "--disable-blink-features=AutomationControlled",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-          ],
+          args: ["--no-sandbox", "--disable-dev-shm-usage"],
           viewport: { width: 1280, height: 900 },
-          locale: "en-US",
-          timezoneId: "America/Los_Angeles",
+        })
+        .catch((e2) => {
+          err("bundled chromium failed:", e2?.message ?? e2);
+          process.exit(1);
         });
-      } catch (e2) {
-        err("bundled chromium also failed:", e2?.message ?? e2);
-        return false;
-      }
     } else {
-      return false;
+      process.exit(1);
     }
   }
-
-  try {
-    const page = await context.newPage();
-    page.setDefaultNavigationTimeout(45_000);
-    await page.goto("https://www.laundrycat.com/availability", {
-      waitUntil: "domcontentloaded",
-    });
-
-    // If we land on /login, ask the human to sign in this once.
-    if (/\/login|\/$/i.test(new URL(page.url()).pathname)) {
-      const loginPath = new URL(page.url()).pathname;
-      if (loginPath === "/login" || loginPath === "/") {
-        warn(
-          `not signed in — please sign in manually in the open window. Card: ${C.cyan}695395634${C.reset}`,
-        );
-        warn(
-          "after you click Login successfully, this script will continue automatically.",
-        );
-        await page.waitForURL(/laundrycat\.com\/(availability|trends|purchases|subscriptions)/, {
-          timeout: 10 * 60_000,
-        });
-        ok("sign-in detected.");
-      }
-    }
-
-    const cookies = await context.cookies("https://www.laundrycat.com");
-    const session = cookies.find((c) => c.name === "laravel_session");
-    if (!session) {
-      err("no laravel_session cookie present — try signing in manually next run.");
-      return false;
-    }
-
-    const res = await fetch(WEBHOOK, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-ingest-token": TOKEN,
-      },
-      body: JSON.stringify({ cookie: session.value, ttlSeconds: 110 * 60 }),
-    });
-    const text = await res.text();
-    if (res.ok) {
-      ok(
-        `cookie relayed → ${WEBHOOK} (HTTP ${res.status}). Snapshot will refresh on next cron tick.`,
-      );
-      return true;
-    }
-    err(`webhook rejected: HTTP ${res.status}: ${text.slice(0, 200)}`);
-    return false;
-  } catch (e) {
-    err("refresh error:", e?.message ?? e);
-    return false;
-  } finally {
-    await context.close().catch(() => undefined);
-  }
-}
-
-// ----- main loop -------------------------------------------------------------
-async function main() {
-  console.log("");
-  console.log(`${C.bold}${C.cyan}123 Laundry · LaundryCat relay${C.reset}`);
-  console.log(`  webhook:   ${WEBHOOK}`);
-  console.log(`  interval:  every ${INTERVAL_MIN} min`);
-  console.log(`  channel:   ${CHANNEL}${HEADLESS ? " (headless)" : " (headed)"}`);
-  console.log(`  profile:   ${PROFILE_DIR}`);
-  console.log("");
-  console.log(
-    `${C.dim}Press Ctrl+C to stop. After your first successful login, you can set LAUNDRYCAT_RELAY_HEADLESS=true in .env.local and minimize the terminal.${C.reset}`,
-  );
-  console.log("");
 
   let stopping = false;
   process.on("SIGINT", () => {
     if (stopping) process.exit(1);
     stopping = true;
-    log(C.yellow + "stopping…" + C.reset);
+    log(C.yellow + "stopping… (closing browser)" + C.reset);
+    context.close().finally(() => process.exit(0));
   });
-  process.on("SIGTERM", () => process.exit(0));
 
+  // Reuse an existing tab if Chrome restored one; otherwise open a new one.
+  const page =
+    context.pages().find((p) => /laundrycat\.com/i.test(p.url())) ??
+    (await context.newPage());
+  page.setDefaultNavigationTimeout(45_000);
+
+  // Navigate to the live page. If we land on /login, wait for the human to
+  // sign in. After that, never reload — the in-page JS keeps the session
+  // warm by polling /machines, and we piggyback off that.
+  await page.goto("https://www.laundrycat.com/availability", {
+    waitUntil: "domcontentloaded",
+  });
+
+  while (
+    !stopping &&
+    /\/(login|$)/i.test(new URL(page.url()).pathname.replace(/\/$/, "/"))
+  ) {
+    if (
+      new URL(page.url()).pathname === "/login" ||
+      new URL(page.url()).pathname === "/"
+    ) {
+      warn(
+        `not signed in — please sign in manually in the open window. Card: ${C.cyan}695395634${C.reset}`,
+      );
+      warn(`The script will detect the redirect automatically.`);
+      try {
+        await page.waitForURL(
+          /laundrycat\.com\/(availability|trends|purchases|subscriptions)/,
+          { timeout: 10 * 60_000 },
+        );
+        ok("sign-in detected.");
+        break;
+      } catch (e) {
+        err("waited 10 minutes without a sign-in, retrying…");
+        await page.goto("https://www.laundrycat.com/availability", {
+          waitUntil: "domcontentloaded",
+        });
+      }
+    }
+  }
+
+  // Steady-state loop: poll /machines from inside the page, post snapshot.
+  let consecutiveFailures = 0;
   while (!stopping) {
-    await refreshOnce();
+    try {
+      const json = await page.evaluate(async () => {
+        const r = await fetch("/machines", {
+          headers: {
+            Accept: "application/json, text/plain, */*",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!r.ok) {
+          throw new Error("HTTP " + r.status);
+        }
+        return await r.json();
+      });
+
+      if (!json || !json.display_locations) {
+        warn("response missing display_locations — page may have logged out");
+      } else {
+        const post = await fetch(WEBHOOK, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-ingest-token": TOKEN,
+          },
+          body: JSON.stringify({ rawJson: json }),
+        });
+        if (post.ok) {
+          const data = await post.json().catch(() => ({}));
+          const stored = (data.locations ?? [])
+            .map(
+              (l) => `${l.slug}: ${l.washersAvailable}w / ${l.dryersAvailable}d open`,
+            )
+            .join(", ");
+          ok(`snapshot relayed → ${stored || "no locations"}`);
+          consecutiveFailures = 0;
+        } else {
+          const text = await post.text().catch(() => "");
+          err(`webhook ${post.status}: ${text.slice(0, 200)}`);
+          consecutiveFailures++;
+        }
+      }
+    } catch (e) {
+      err("poll error:", e?.message ?? e);
+      consecutiveFailures++;
+      // If we've failed several times in a row, the page may have logged
+      // out somehow. Try a soft reload — Laravel will redirect to /login
+      // if the session really is gone, and we'll surface that clearly.
+      if (consecutiveFailures >= 3) {
+        warn("3 consecutive poll failures — soft-reloading the page");
+        try {
+          await page.reload({ waitUntil: "domcontentloaded" });
+          if (/\/login/.test(new URL(page.url()).pathname)) {
+            warn("session was lost — please sign in again in the window");
+            await page.waitForURL(
+              /laundrycat\.com\/(availability|trends|purchases|subscriptions)/,
+              { timeout: 10 * 60_000 },
+            );
+            ok("re-signed in.");
+            consecutiveFailures = 0;
+          }
+        } catch {
+          /* ignore — next loop iteration will try again */
+        }
+      }
+    }
+
     if (stopping) break;
-    log(`sleeping ${INTERVAL_MIN} min until next refresh…`);
-    // Sleep in 1s ticks so SIGINT doesn't take 30 min to land.
-    const wakeAt = Date.now() + INTERVAL_MS;
+    // Sleep in 1s ticks so SIGINT lands quickly.
+    const wakeAt = Date.now() + INTERVAL_SEC * 1000;
     while (!stopping && Date.now() < wakeAt) {
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
-  process.exit(0);
 }
 
 main().catch((e) => {
