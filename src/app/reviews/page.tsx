@@ -12,7 +12,7 @@ import { REVIEW_SOURCES } from "@/lib/site-data";
 export const metadata: Metadata = {
   title: "Reviews — Read Real Customer Feedback",
   description:
-    "We don't put fake testimonials on our website. Read real 123 Laundry reviews — and leave your own — on Google, Facebook, and Yelp.",
+    "We don't put fake testimonials on our website. Read real 123 Laundry reviews — and leave your own — on Google and Facebook.",
   alternates: { canonical: "/reviews" },
 };
 
@@ -25,13 +25,13 @@ export default function ReviewsPage() {
         <SectionHeading level={1}>Read real reviews. Leave your own.</SectionHeading>
         <p className="mt-6 max-w-3xl text-lg text-ink/75">
           We don't fabricate testimonials. The honest answer to "what do
-          customers say?" is on Google, Facebook, and Yelp — and we'd love it
-          if you added your two cents.
+          customers say?" is on Google and Facebook — and we'd love it if you
+          added your two cents.
         </p>
       </Section>
 
       <Section>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {REVIEW_SOURCES.map((src) => (
             <Card key={src.label}>
               <h2 className="font-display text-lg font-bold">{src.label}</h2>

@@ -24,9 +24,8 @@ export default function LocationsIndex() {
         <SectionEyebrow>Locations</SectionEyebrow>
         <SectionHeading level={1}>Two stores. One promise.</SectionHeading>
         <p className="mt-6 max-w-3xl text-lg text-ink/75">
-          Pick the location closer to you. Both run the same modern, card-based
-          setup with on-site attendants, free Wi-Fi, and a kids' literacy
-          corner. Spokane Valley adds extra-large washers and 100% soft water.
+          Pick the location closer to you. Both run the same modern setup with
+          on-site attendants.
         </p>
       </Section>
 

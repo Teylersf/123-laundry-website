@@ -55,9 +55,9 @@ export default function PricingPage() {
           <Card>
             <h2 className="font-display text-xl font-bold">Loading your card</h2>
             <p className="mt-3 text-ink/75">
-              Walk up to the touch-screen kiosk near the entrance, insert a
-              debit or credit card, and load any amount onto a 123 Laundry
-              card. The kiosk issues you a card on the spot.
+              Walk up to the touch-screen kiosk near the entrance and load any
+              amount onto a 123 Laundry card. The kiosk issues you a card on
+              the spot.
             </p>
             <p className="mt-3 text-ink/75">
               Cards never expire. Whatever you don't use stays on the card for
@@ -65,24 +65,10 @@ export default function PricingPage() {
             </p>
           </Card>
           <Card>
-            <h2 className="font-display text-xl font-bold">Per-machine pricing</h2>
-            <p className="mt-3 text-ink/75">
-              Wash and dry pricing is posted on each machine. Larger washers
-              cost more than smaller ones (because they hold more), and dryer
-              pricing is by time. The kiosk and the machine displays both
-              show what a cycle will cost before you start.
-            </p>
-            <p className="mt-3 text-ink/75">
-              For current pricing, drop into either location or call us — our
-              attendants are happy to give you a rundown over the phone.
-            </p>
-          </Card>
-          <Card>
             <h2 className="font-display text-xl font-bold">Reloading</h2>
             <p className="mt-3 text-ink/75">
-              Reload at any kiosk in either store, or online any time through
-              our LaundryCat partner portal — it's the same card you check
-              your balance with.
+              Reload at any kiosk in either store — it's the same card you
+              check your balance with.
             </p>
             <div className="mt-4">
               <Button href={BUSINESS.cardBalanceUrl} external>Open LaundryCat</Button>

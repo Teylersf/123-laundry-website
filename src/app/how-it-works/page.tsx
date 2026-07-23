@@ -25,7 +25,7 @@ const STEPS = [
   {
     n: "2",
     title: "Load any amount onto a card",
-    body: "Insert a debit or credit card and load whatever amount you'd like onto a 123 Laundry card. The kiosk will issue you a card on the spot — keep it for next time.",
+    body: "Load whatever amount you'd like onto a 123 Laundry card. The kiosk will issue you a card on the spot — keep it for next time.",
   },
   {
     n: "3",
@@ -122,10 +122,9 @@ export default function HowItWorksPage() {
         <div className="mt-8 grid gap-5 md:grid-cols-2">
           {[
             ["You don't have to commit to a big balance.", "The kiosk lets you load whatever amount makes sense for the loads you're doing today."],
-            ["Lost cards.", "Tell our attendant or call us — we can help look up your account and transfer the balance."],
+            ["Lost cards.", "If you register your Laundry card and lose it, no worries. Enter your phone number to receive a replacement card and keep your remaining balance."],
             ["The card never expires.", "Keep it in your laundry basket for next time. Whatever balance you didn't use is still there."],
-            ["Bring detergent or buy on site.", "Use what you love at home, or grab single-load detergent and dryer sheets from our vending area."],
-            ["Watch for the load-completion light.", "Each machine signals when it's done. Be considerate of the next customer and unload promptly."],
+            ["Bring detergent or buy on site.", "Use what you love at home, or grab detergent and dryer sheets from our vending area."],
             ["Last load goes in at 8 PM.", "Doors close at 9 PM. Plan your start time around that — no one likes being rushed."],
           ].map(([title, body]) => (
             <Card key={title}>

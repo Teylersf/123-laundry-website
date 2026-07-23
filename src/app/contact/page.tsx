@@ -25,8 +25,7 @@ export default function ContactPage() {
         <SectionHeading level={1}>Reach out — we're locals, and we answer.</SectionHeading>
         <p className="mt-6 max-w-3xl text-lg text-ink/75">
           Phone is fastest. Social DMs work too. Either way, you'll be talking
-          to {BUSINESS.owners} or one of our on-site attendants — never a call
-          center.
+          to an owner or one of our on-site attendants — never a call center.
         </p>
       </Section>
 

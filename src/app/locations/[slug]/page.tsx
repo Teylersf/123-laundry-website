@@ -14,7 +14,6 @@ import {
   LOCATIONS,
   LOCATION_LIST,
   SITE_URL,
-  STORY,
   type LocationSlug,
 } from "@/lib/site-data";
 
@@ -197,15 +196,6 @@ export default async function LocationPage(
           </aside>
         </div>
       </Section>
-
-      {loc.slug === "deer-park" && (
-        <Section className="bg-paper-soft">
-          <SectionEyebrow>The building</SectionEyebrow>
-          <SectionHeading>From 1950s tire shop to spotless laundromat.</SectionHeading>
-          <p className="mt-6 max-w-3xl text-ink/80">{STORY.building}</p>
-          <p className="mt-4 max-w-3xl text-ink/80">{STORY.community}</p>
-        </Section>
-      )}
 
       <Section>
         <SectionEyebrow>The other location</SectionEyebrow>

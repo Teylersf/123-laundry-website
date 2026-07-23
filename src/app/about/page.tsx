@@ -8,12 +8,12 @@ import {
   Card,
   Breadcrumbs,
 } from "@/components/ui";
-import { BUSINESS, STORY, LOCATION_LIST } from "@/lib/site-data";
+import { ABOUT_COPY, LOCATION_LIST } from "@/lib/site-data";
 
 export const metadata: Metadata = {
   title: "About 123 Laundry — Our Story",
   description:
-    "123 Laundry is owned and operated by Jake and Katie Duenich. Our flagship store sits in the historic Fackenthall building in Deer Park, WA — and our second store opened in Spokane Valley in December 2025.",
+    "Established in 2024, 123 Laundry is a clean, safe, modern laundromat with two locations in Eastern Washington — Deer Park and Spokane Valley.",
   alternates: { canonical: "/about" },
 };
 
@@ -26,24 +26,17 @@ export default function AboutPage() {
         <SectionHeading level={1}>
           Family-owned. Locally rebuilt. Proudly Eastern Washington.
         </SectionHeading>
-        <p className="mt-6 max-w-3xl text-lg text-ink/75">
-          {BUSINESS.name} was founded by {BUSINESS.owners} in {BUSINESS.established},
-          starting with our flagship in Jake's hometown of Deer Park and expanding
-          to Spokane Valley in December 2025.
-        </p>
       </Section>
 
       <Section>
-        <div className="grid gap-12 md:grid-cols-12">
+        <div className="grid gap-10 md:grid-cols-12 md:gap-12">
           <div className="md:col-span-7">
             <SectionEyebrow>The story</SectionEyebrow>
             <SectionHeading>How we got here.</SectionHeading>
-            <div className="prose mt-6 max-w-none text-ink/80">
-              <p className="text-ink/80">{STORY.origin}</p>
-              <p className="mt-4 text-ink/80">{STORY.founders}</p>
-              <p className="mt-4 text-ink/80">{STORY.building}</p>
-              <p className="mt-4 text-ink/80">{STORY.community}</p>
-              <p className="mt-4 text-ink/80">{STORY.goal}</p>
+            <div className="mt-6 space-y-4 text-ink/80">
+              {ABOUT_COPY.map((para) => (
+                <p key={para}>{para}</p>
+              ))}
             </div>
           </div>
           <aside className="md:col-span-5">
@@ -53,20 +46,10 @@ export default function AboutPage() {
                 alt="Inside 123 Laundry — stainless commercial washers and honeycomb LED lighting"
                 width={1280}
                 height={1280}
+                sizes="(max-width: 768px) 100vw, 40vw"
                 className="h-full w-full object-cover"
               />
             </div>
-            <Card className="mt-6">
-              <h3 className="font-display text-lg font-bold">By the numbers</h3>
-              <ul className="mt-3 space-y-2 text-sm text-ink/75">
-                <li><strong>Founded:</strong> {BUSINESS.established}</li>
-                <li><strong>Owners:</strong> {BUSINESS.owners}</li>
-                <li><strong>Locations:</strong> 2 — Deer Park and Spokane Valley</li>
-                <li><strong>Hours:</strong> 7 days a week, 365 days a year</li>
-                <li><strong>Renovation time (Deer Park):</strong> 2 months, 4 days</li>
-                <li><strong>Building age (Deer Park):</strong> Built 1950s — historic Fackenthall building</li>
-              </ul>
-            </Card>
           </aside>
         </div>
       </Section>

@@ -11,7 +11,6 @@ import {
 import { Icon } from "@/components/feature-icon";
 import { LiveMachineStatus } from "@/components/live-machine-status";
 import {
-  AMENITIES,
   BUSINESS,
   FAQ,
   HEADLINE_FEATURES,
@@ -36,15 +35,15 @@ export default function HomePage() {
           />
           <div className="absolute inset-0 bg-linear-to-b from-ink/75 via-ink/70 to-ink/90" />
         </div>
-        <div className="relative mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-32">
+        <div className="relative mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-28">
           <Pill>Locally owned · Deer Park &amp; Spokane Valley</Pill>
           <h1 className="mt-5 max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
             The cleanest laundromat
             <span className="block text-brand-200">in town.</span>
           </h1>
           <p className="mt-6 max-w-2xl text-lg text-paper/80 md:text-xl">
-            123 Laundry is a family-owned, modern, card-based laundromat with
-            two locations in Eastern Washington. {BUSINESS.tagline}
+            123 Laundry is a family-owned, modern laundromat with two locations
+            in Eastern Washington.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Button href="/locations">Find a location</Button>
@@ -58,7 +57,7 @@ export default function HomePage() {
 
           <div className="mt-12 grid grid-cols-2 gap-6 md:max-w-3xl md:grid-cols-4">
             <Stat value="2" label="Locations" />
-            <Stat value="365" label="Days a year, open" />
+            <Stat value="364" label="Days a year, open" />
             <Stat value="0" label="Quarters required" />
             <Stat value="100%" label="Soft water, every machine" />
           </div>
@@ -119,9 +118,7 @@ export default function HomePage() {
             <SectionEyebrow>Two locations</SectionEyebrow>
             <SectionHeading>Pick the one closer to you.</SectionHeading>
             <p className="mt-4 max-w-md text-ink/70">
-              Both stores run the same modern, card-based setup with on-site
-              attendants, free Wi-Fi, and a kids' literacy corner. Spokane
-              Valley adds 100% soft water and extra-large washers.
+              Both stores run the same modern setup with on-site attendants.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Button href="/locations">All locations</Button>
@@ -267,7 +264,7 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* DEEPER AMENITY DETAILS — under-the-fold, longer-form */}
+      {/* DEEPER AMENITY DETAILS — homepage keeps only the link to the full page */}
       <Section className="bg-paper-soft">
         <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
           <div>
@@ -278,14 +275,6 @@ export default function HomePage() {
             Open amenities page
           </Button>
         </div>
-        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {AMENITIES.slice(0, 9).map((a) => (
-            <Card key={a.title}>
-              <div className="font-display text-lg font-bold">{a.title}</div>
-              <p className="mt-2 text-sm text-ink/70">{a.body}</p>
-            </Card>
-          ))}
-        </div>
       </Section>
 
       {/* REVIEWS — link out, never fabricate */}
@@ -294,9 +283,9 @@ export default function HomePage() {
         <SectionHeading>Read what real customers are saying.</SectionHeading>
         <p className="mt-4 max-w-2xl text-ink/70">
           We don't put fake testimonials on our website. Read real reviews — and
-          leave us one too — on Google, Facebook, and Yelp.
+          leave us one too — on Google and Facebook.
         </p>
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {REVIEW_SOURCES.map((src) => (
             <li key={src.label}>
               <a
@@ -353,27 +342,6 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* CTA */}
-      <Section className="bg-ink text-paper">
-        <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <SectionHeading className="text-paper">
-              Bring us your laundry.
-            </SectionHeading>
-            <p className="mt-2 text-paper/80">
-              Open every day. {BUSINESS.phone} ·{" "}
-              <Link href="/locations" className="underline decoration-dotted underline-offset-4 hover:text-brand-200">
-                find a location
-              </Link>
-              .
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button href="/locations/deer-park">Deer Park</Button>
-            <Button href="/locations/spokane-valley">Spokane Valley</Button>
-          </div>
-        </div>
-      </Section>
     </>
   );
 }

@@ -68,7 +68,7 @@ export const LOCATIONS: Record<LocationSlug, Location> = {
     appleMaps:
       "https://maps.apple.com/?address=22+S+Vernon+Ave,Deer+Park,WA+99006&q=123+Laundry",
     intro:
-      "Our flagship store sits in the historic Fackenthall building in downtown Deer Park — a 1950s tire shop that owner Jake Duenich and his wife Katie reclaimed and rebuilt into the cleanest laundromat in town. Across the street from the Deer Park Post Office.",
+      "Our flagship store sits in the historic Fackenthall building in downtown Deer Park — a 1950s tire shop that the owners reclaimed and rebuilt into the cleanest laundromat in town. Across the street from the Deer Park Post Office.",
     highlights: [
       "Open 6 AM to 9 PM, every single day",
       "Last load goes in at 8 PM, doors close at 9 PM",
@@ -200,7 +200,7 @@ export const HEADLINE_FEATURES: Feature[] = [
     icon: "soft-water",
   },
   {
-    title: "Text when it's done",
+    title: "Machines text you when finished",
     blurb: "Opt in and we'll text you when your washer or dryer finishes.",
     icon: "text-alerts",
   },
@@ -260,7 +260,7 @@ export const AMENITIES = [
   },
   {
     title: "Open every day",
-    body: "Both locations are open seven days a week, 365 days a year — including holidays.",
+    body: "Both locations are open seven days a week, 364 days a year.",
   },
 ];
 
@@ -288,13 +288,18 @@ export const REVIEW_SOURCES = [
     href: "https://www.google.com/maps/search/?api=1&query=123+Laundry+110+S+Pines+Rd+Spokane+Valley+WA",
   },
   {
-    label: "Yelp — Spokane Valley",
-    href: "https://www.yelp.com/biz/123-laundry-spokane-valley",
-  },
-  {
     label: "Facebook — 123 Laundry",
     href: "https://www.facebook.com/123LaundryDeerParkWA",
   },
+];
+
+// Verbatim About copy from the owners' current live site (123-laundry.com).
+// This is the voice the owners wrote themselves — keep as-is unless they
+// change it upstream.
+export const ABOUT_COPY = [
+  "Established in 2024, 123 Laundry takes pride in being small business owners. With strong ties to the area and experiences from traveling across the great USA, we've encountered a variety of laundromats — some commendable and others we fondly refer to as ‘zombie-mats.’",
+  "123 Laundry is designed to be a clean, safe, and modern space. Having been laundromat customers ourselves, we strive to provide excellent customer service.",
+  "123 Laundry has been crafted with our favorite elements from the many laundromats we've visited, and we promise many more great surprises to come.",
 ];
 
 // Service areas — neighborhoods and nearby towns within driving distance of
@@ -588,7 +593,7 @@ export const FAQ = [
   },
   {
     q: "When are you open?",
-    a: "Both locations are open seven days a week, 365 days a year. Deer Park: 6:00 AM – 9:00 PM. Spokane Valley: 7:00 AM – 9:00 PM. Last load at both locations is 8:00 PM; doors close at 9:00 PM.",
+    a: "Both locations are open seven days a week, 364 days a year. Deer Park: 6:00 AM – 9:00 PM. Spokane Valley: 7:00 AM – 9:00 PM. Last load at both locations is 8:00 PM; doors close at 9:00 PM.",
   },
   {
     q: "Where are you located?",
