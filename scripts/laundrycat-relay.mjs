@@ -23,10 +23,19 @@
  *   LAUNDRYCAT_RELAY_HEADLESS       "true" to run headless after first login
  *   LAUNDRYCAT_RELAY_PROFILE_DIR    where to keep the Chromium profile
  */
-import { chromium } from "playwright";
+import { chromium as vanillaChromium } from "playwright";
+import { chromium as extraChromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { readFileSync, mkdirSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+// playwright-extra accepts puppeteer-extra plugins; the stealth plugin
+// patches the ~20 fingerprint tells Google reCAPTCHA uses to flag automation
+// (navigator.webdriver, missing chrome.runtime, WebGL SwiftShader, etc.).
+extraChromium.use(StealthPlugin());
+const chromium = extraChromium;
+void vanillaChromium; // kept as fallback reference
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +99,50 @@ const ok = (...a) => console.log(stamp(), C.green + "✓" + C.reset, ...a);
 const warn = (...a) => console.log(stamp(), C.yellow + "!" + C.reset, ...a);
 const err = (...a) => console.log(stamp(), C.red + "×" + C.reset, ...a);
 
+// ----- stealth init script ---------------------------------------------------
+// Mirrors src/lib/laundrycat-playwright.ts applyStealth(). The stealth plugin
+// covers most of this already, but doubling up is cheap insurance against a
+// tell we don't know about.
+async function applyStealth(context) {
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
+    const plugin = {
+      name: "Chrome PDF Plugin",
+      filename: "internal-pdf-viewer",
+      description: "Portable Document Format",
+      length: 1,
+    };
+    Object.defineProperty(navigator, "plugins", { get: () => [plugin, plugin, plugin] });
+    Object.defineProperty(navigator, "mimeTypes", { get: () => [{ type: "application/pdf" }] });
+    if (!window.chrome) {
+      window.chrome = {
+        runtime: {},
+        app: {
+          isInstalled: false,
+          InstallState: { DISABLED: "disabled" },
+          RunningState: { RUNNING: "running" },
+        },
+        loadTimes: () => ({}),
+        csi: () => ({}),
+      };
+    }
+    const origQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
+    window.navigator.permissions.query = (params) =>
+      params.name === "notifications"
+        ? Promise.resolve({ state: Notification.permission })
+        : origQuery(params);
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function (parameter) {
+      if (parameter === 37445) return "Intel Inc.";
+      if (parameter === 37446) return "Intel Iris OpenGL Engine";
+      return getParameter.call(this, parameter);
+    };
+    Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
+    Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
+  });
+}
+
 // ----- main ------------------------------------------------------------------
 async function main() {
   console.log("");
@@ -120,11 +173,15 @@ async function main() {
         "--disable-blink-features=AutomationControlled",
         "--no-sandbox",
         "--disable-dev-shm-usage",
+        "--disable-features=IsolateOrigins,site-per-process",
       ],
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
       viewport: { width: 1280, height: 900 },
       locale: "en-US",
       timezoneId: "America/Los_Angeles",
     });
+    await applyStealth(context);
   } catch (e) {
     err("could not launch browser:", e?.message ?? e);
     if (CHANNEL === "chrome") {
