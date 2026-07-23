@@ -11,7 +11,7 @@ export function Section({
   id?: string;
 }) {
   return (
-    <section id={id} className={`py-14 md:py-20 ${className}`}>
+    <section id={id} className={`py-12 md:py-20 ${className}`}>
       <div className="mx-auto max-w-7xl px-4 md:px-6">{children}</div>
     </section>
   );
@@ -36,7 +36,7 @@ export function SectionHeading({
 }) {
   const Tag = (`h${level}` as unknown) as "h1" | "h2" | "h3";
   const sizes = {
-    1: "text-4xl md:text-6xl",
+    1: "text-4xl sm:text-5xl md:text-6xl",
     2: "text-3xl md:text-4xl",
     3: "text-2xl md:text-3xl",
   } as const;
