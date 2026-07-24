@@ -91,3 +91,61 @@ h6 {
       box-shadow 160ms ease;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Live machine status — washer / dryer animations                            */
+/* -------------------------------------------------------------------------- */
+
+/* Washer drum: continuous spin with a slight wobble so it doesn't look like
+   a boring wheel. Slower than a real spin cycle so it reads across the grid
+   without turning into a strobe. */
+@keyframes machine-spin {
+  0%   { transform: rotate(0deg)   translate(0, 0); }
+  25%  { transform: rotate(90deg)  translate(0.3%, -0.3%); }
+  50%  { transform: rotate(180deg) translate(0, 0); }
+  75%  { transform: rotate(270deg) translate(-0.3%, 0.3%); }
+  100% { transform: rotate(360deg) translate(0, 0); }
+}
+
+/* Dryer tumble — one full rotation per cycle but staggered so a row of
+   dryers doesn't animate in perfect lockstep (each drum has its own delay). */
+@keyframes machine-tumble {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+/* Water line inside the washer window: rises + falls like a load agitating.
+   Uses translateY on a filled rect that clips through the porthole SVG. */
+@keyframes machine-water {
+  0%, 100% { transform: translateY(35%); }
+  25%      { transform: translateY(30%); }
+  50%      { transform: translateY(45%); }
+  75%      { transform: translateY(32%); }
+}
+
+/* Bubbles rising through the washer water — three staggered pips. */
+@keyframes machine-bubble {
+  0%   { transform: translateY(20%); opacity: 0; }
+  25%  { opacity: 0.9; }
+  100% { transform: translateY(-90%); opacity: 0; }
+}
+
+/* Heat wisps rising above a busy dryer — vertical drift + fade. */
+@keyframes machine-steam {
+  0%   { transform: translateY(0) scale(0.7); opacity: 0; }
+  30%  { opacity: 0.5; }
+  100% { transform: translateY(-140%) scale(1.2); opacity: 0; }
+}
+
+/* Available state — subtle "breathing" glow so it reads as ready. */
+@keyframes machine-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .machine-anim,
+  .machine-anim * {
+    animation: none !important;
+  }
+}

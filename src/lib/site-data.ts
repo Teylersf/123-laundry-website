@@ -60,8 +60,8 @@ export const LOCATIONS: Record<LocationSlug, Location> = {
     hoursOpenLocal: "06:00",
     hoursCloseLocal: "21:00",
     hoursLastLoad: "Last load accepted at 8:00 PM",
-    openedDate: "July 2024",
-    openingDateMachine: "2024-07-02",
+    openedDate: "June 2024",
+    openingDateMachine: "2024-06-02",
     geo: { lat: 47.9542, lng: -117.4769 },
     googleMaps:
       "https://www.google.com/maps/search/?api=1&query=22+S+Vernon+Ave%2C+Deer+Park%2C+WA+99006",
@@ -216,7 +216,7 @@ export const HEADLINE_FEATURES: Feature[] = [
 export const AMENITIES = [
   {
     title: "Card-based payment",
-    body: "Touch-screen kiosks let you load any amount onto a 123 Laundry card. No quarters required. Reload anytime, in person or online.",
+    body: "Touch-screen kiosks let you load any amount onto a 123 Laundry card. No quarters required. Reload anytime in person.",
   },
   {
     title: "Free Wi-Fi",
@@ -480,7 +480,7 @@ export const SEO_LANDINGS: SeoLanding[] = [
       "Family-owned 123 Laundry is a modern, card-based laundromat in downtown Deer Park, WA. Open 6 AM – 9 PM every day. 22 S Vernon Ave, across from the Post Office.",
     primaryLocation: "deer-park",
     body: [
-      "Our Deer Park flagship is the original 123 Laundry — owner-operated by Jake and Katie Duenich since July 2024, in the historic Fackenthall building at 22 S Vernon Ave.",
+      "Our Deer Park flagship is the original 123 Laundry — owner-operated by Jake and Katie Duenich since June 2024, in the historic Fackenthall building at 22 S Vernon Ave.",
       "We rebuilt this 1950s tire shop into the cleanest laundromat in town. Polished surfaces, real ventilation, modern stainless machines, a complete soft water system feeding every washer, and an on-site attendant during most operating hours so you're never on your own.",
       "The card-based system is the easiest part: load any amount onto a 123 Laundry card at our touch-screen kiosk, then tap to start the washer or dryer. No quarters. Free Wi-Fi while you wait, plus a kids' literacy corner if you bring the family.",
       "Opt in at the kiosk and we'll text you when your washer is done — and again when your dryer finishes. Run errands across the street or down Main; come back to a perfectly-timed load.",
@@ -649,7 +649,7 @@ export const FAQ = [
   },
   {
     q: "Who owns 123 Laundry?",
-    a: "Jake and Katie Duenich. Jake grew up in Deer Park, spent years on the road as a lineman, and came home to start the business with Katie. The name was their four-year-old's idea: 1 — wash, 2 — dry, 3 — fold.",
+    a: "Jake and Katie Duenich — family-owned and local.",
   },
   {
     q: "How can I get in touch?",

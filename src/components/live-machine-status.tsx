@@ -439,102 +439,301 @@ function DrumRow({
   );
 }
 
+// ---------- Machine icons ---------------------------------------------------
+//
+// Each machine renders as a small illustrated appliance (washer or dryer)
+// with state-driven animation:
+//   available → subtle breathing glow around the door
+//   busy      → the drum spins, plus per-kind flair (washer sloshes water
+//               with rising bubbles; dryer tumbles clothes with rising steam)
+//   offline   → desaturated, no motion, small ⨯ mark
+// Keyframes live in globals.css and are gated on prefers-reduced-motion.
+
+type MachineStatusVisual = "available" | "busy" | "offline" | "unknown";
+
+function statusPalette(status: MachineStatusVisual) {
+  switch (status) {
+    case "available":
+      return {
+        body: "fill-[#101418] stroke-emerald-400/40",
+        door: "stroke-emerald-300/70",
+        drum: "fill-emerald-500/10 stroke-emerald-400/50",
+        text: "text-emerald-300",
+        badge: "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]",
+      };
+    case "busy":
+      return {
+        body: "fill-[#101418] stroke-amber-400/50",
+        door: "stroke-amber-300/70",
+        drum: "fill-amber-500/10 stroke-amber-400/60",
+        text: "text-amber-200",
+        badge: "bg-amber-400",
+      };
+    case "offline":
+      return {
+        body: "fill-[#101418] stroke-zinc-600/40",
+        door: "stroke-zinc-500/50",
+        drum: "fill-zinc-700/15 stroke-zinc-600/40",
+        text: "text-zinc-500",
+        badge: "bg-zinc-500",
+      };
+    default:
+      return {
+        body: "fill-[#101418] stroke-zinc-600/40",
+        door: "stroke-zinc-500/50",
+        drum: "fill-zinc-700/15 stroke-zinc-600/40",
+        text: "text-zinc-500",
+        badge: "bg-zinc-500",
+      };
+  }
+}
+
+/**
+ * Front-load WASHER — round porthole, water line, bubbles when busy.
+ * Uses a per-machine seed so a row of washers doesn't animate in lockstep.
+ */
+function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: number }) {
+  const p = statusPalette(status);
+  const spinDelay = -(seed % 12);
+  const busy = status === "busy";
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className="machine-anim absolute inset-0 h-full w-full"
+      aria-hidden="true"
+    >
+      {/* Body */}
+      <rect x="8" y="6" width="84" height="88" rx="12" className={`${p.body}`} strokeWidth={2} />
+      {/* Control panel */}
+      <rect x="14" y="12" width="72" height="10" rx="3" className="fill-white/[0.03] stroke-white/10" strokeWidth={1} />
+      <circle cx="80" cy="17" r="1.6" className="fill-emerald-400/70" />
+      <circle cx="74" cy="17" r="1.6" className="fill-white/20" />
+      {/* Porthole outer */}
+      <circle cx="50" cy="58" r="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
+      {/* Drum window — spinning + water */}
+      <g
+        style={{
+          transformOrigin: "50px 58px",
+          animation: busy ? `machine-spin 6s linear infinite ${spinDelay}s` : undefined,
+        }}
+      >
+        <circle cx="50" cy="58" r="22" className={`${p.drum}`} strokeWidth={1.5} />
+        {/* Drum divot pattern so the spin is visible */}
+        {[0, 60, 120, 180, 240, 300].map((deg) => (
+          <circle
+            key={deg}
+            cx={50 + 15 * Math.cos((deg * Math.PI) / 180)}
+            cy={58 + 15 * Math.sin((deg * Math.PI) / 180)}
+            r="1.4"
+            className="fill-white/15"
+          />
+        ))}
+      </g>
+      {/* Water — clip to porthole so it only shows inside the drum */}
+      <defs>
+        <clipPath id={`washer-clip-${seed}`}>
+          <circle cx="50" cy="58" r="22" />
+        </clipPath>
+      </defs>
+      {busy && (
+        <g clipPath={`url(#washer-clip-${seed})`}>
+          <rect
+            x="28"
+            y="58"
+            width="44"
+            height="26"
+            className="fill-brand-400/45"
+            style={{
+              transformOrigin: "50px 70px",
+              animation: `machine-water 3.4s ease-in-out infinite ${(-seed % 3)}s`,
+            }}
+          />
+          {/* Rising bubbles */}
+          {[0, 1, 2].map((i) => (
+            <circle
+              key={i}
+              cx={42 + i * 7}
+              cy="76"
+              r={1.4 + (i % 2) * 0.6}
+              className="fill-white/70"
+              style={{
+                transformOrigin: `${42 + i * 7}px 76px`,
+                animation: `machine-bubble ${2.4 + i * 0.6}s ease-in infinite ${-((seed + i) % 4)}s`,
+              }}
+            />
+          ))}
+        </g>
+      )}
+      {/* Door hinge/latch highlight */}
+      <circle cx="50" cy="58" r="3" className="fill-white/10 stroke-white/25" strokeWidth={0.6} />
+      {/* Available breathing halo */}
+      {status === "available" && (
+        <circle
+          cx="50"
+          cy="58"
+          r="27"
+          className="fill-none stroke-emerald-300/70"
+          strokeWidth={0.8}
+          style={{
+            transformOrigin: "50px 58px",
+            animation: `machine-breathe 3.4s ease-in-out infinite ${-(seed % 3)}s`,
+          }}
+        />
+      )}
+      {/* Offline slash */}
+      {status === "offline" && (
+        <line x1="30" y1="30" x2="70" y2="86" className="stroke-zinc-500/60" strokeWidth={1.5} strokeLinecap="round" />
+      )}
+    </svg>
+  );
+}
+
+/**
+ * DRYER — round port with a slot vent above, tumbling clothes + rising heat.
+ */
+function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number }) {
+  const p = statusPalette(status);
+  const tumbleDelay = -(seed % 8);
+  const busy = status === "busy";
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className="machine-anim absolute inset-0 h-full w-full"
+      aria-hidden="true"
+    >
+      {/* Steam wisps — sit ABOVE the body when busy */}
+      {busy && (
+        <g>
+          {[0, 1, 2].map((i) => (
+            <ellipse
+              key={i}
+              cx={30 + i * 20}
+              cy="4"
+              rx={2.4 + i * 0.4}
+              ry={3.5 + i * 0.6}
+              className="fill-white/25"
+              style={{
+                transformOrigin: `${30 + i * 20}px 4px`,
+                animation: `machine-steam ${3 + i * 0.7}s ease-out infinite ${-((seed + i) % 4)}s`,
+              }}
+            />
+          ))}
+        </g>
+      )}
+      {/* Body */}
+      <rect x="8" y="10" width="84" height="84" rx="12" className={`${p.body}`} strokeWidth={2} />
+      {/* Vent slots (top) — distinguishes from washer */}
+      <rect x="18" y="16" width="16" height="2" rx="1" className="fill-white/15" />
+      <rect x="18" y="20" width="12" height="2" rx="1" className="fill-white/10" />
+      <rect x="66" y="17" width="18" height="6" rx="2" className="fill-white/[0.04] stroke-white/10" strokeWidth={1} />
+      <circle cx="79" cy="20" r="1.6" className={busy ? "fill-amber-400" : "fill-white/25"} />
+      {/* Door — slightly larger porthole with rounded rectangle bezel */}
+      <rect x="20" y="34" width="60" height="54" rx="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
+      {/* Tumbling drum */}
+      <g
+        style={{
+          transformOrigin: "50px 61px",
+          animation: busy ? `machine-tumble 7s linear infinite ${tumbleDelay}s` : undefined,
+        }}
+      >
+        <circle cx="50" cy="61" r="22" className={`${p.drum}`} strokeWidth={1.5} />
+        {/* Baffles */}
+        {[0, 120, 240].map((deg) => {
+          const rad = (deg * Math.PI) / 180;
+          return (
+            <line
+              key={deg}
+              x1={50 + 6 * Math.cos(rad)}
+              y1={61 + 6 * Math.sin(rad)}
+              x2={50 + 20 * Math.cos(rad)}
+              y2={61 + 20 * Math.sin(rad)}
+              className={busy ? "stroke-amber-300/60" : "stroke-white/15"}
+              strokeWidth={1.4}
+              strokeLinecap="round"
+            />
+          );
+        })}
+        {/* Tumbling clothes — three little rounded rects that ride the drum */}
+        {busy &&
+          [0, 130, 250].map((deg, i) => {
+            const r = 12;
+            const rad = (deg * Math.PI) / 180;
+            const cx = 50 + r * Math.cos(rad);
+            const cy = 61 + r * Math.sin(rad);
+            return (
+              <rect
+                key={i}
+                x={cx - 3}
+                y={cy - 2}
+                width="6"
+                height="4"
+                rx="1.5"
+                className={
+                  ["fill-brand-300/80", "fill-amber-200/70", "fill-emerald-300/70"][i]
+                }
+              />
+            );
+          })}
+      </g>
+      {/* Available breathing halo */}
+      {status === "available" && (
+        <rect
+          x="18"
+          y="32"
+          width="64"
+          height="58"
+          rx="28"
+          className="fill-none stroke-emerald-300/70"
+          strokeWidth={0.8}
+          style={{
+            transformOrigin: "50px 61px",
+            animation: `machine-breathe 3.4s ease-in-out infinite ${-(seed % 3)}s`,
+          }}
+        />
+      )}
+      {status === "offline" && (
+        <line x1="24" y1="34" x2="76" y2="88" className="stroke-zinc-500/60" strokeWidth={1.5} strokeLinecap="round" />
+      )}
+    </svg>
+  );
+}
+
 // ---------- Single drum visual ----------------------------------------------
 function Drum({ m }: { m: Live }) {
   const status = m.liveStatus;
-  const palettes = {
-    available: {
-      ringOuter: "ring-emerald-400/30",
-      bgOuter: "bg-emerald-400/[0.06]",
-      drumGrad: "from-emerald-300/15 to-emerald-700/30",
-      drumRing: "ring-emerald-400/40",
-      label: "text-emerald-300",
-      pip: "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.7)]",
-    },
-    busy: {
-      ringOuter: "ring-amber-400/40",
-      bgOuter: "bg-amber-400/[0.07]",
-      drumGrad: "from-amber-300/20 to-amber-700/30",
-      drumRing: "ring-amber-400/60",
-      label: "text-amber-200",
-      pip: "bg-amber-400",
-    },
-    offline: {
-      ringOuter: "ring-zinc-500/30",
-      bgOuter: "bg-zinc-700/20",
-      drumGrad: "from-zinc-700/30 to-zinc-900/40",
-      drumRing: "ring-zinc-600/40",
-      label: "text-zinc-500",
-      pip: "bg-zinc-500",
-    },
-    unknown: {
-      ringOuter: "ring-zinc-500/30",
-      bgOuter: "bg-zinc-700/20",
-      drumGrad: "from-zinc-700/30 to-zinc-900/40",
-      drumRing: "ring-zinc-600/40",
-      label: "text-zinc-500",
-      pip: "bg-zinc-500",
-    },
-  } as const;
-  const p = palettes[status];
+  const p = statusPalette(status);
   const showCountdown =
     status === "busy" && m.liveSeconds !== null && m.liveSeconds > 0;
+
+  // Deterministic seed per machine ID so animations offset consistently
+  // across renders (no lockstep row of dryers, no random flicker on rehydrate).
+  const seed = m.id
+    .split("")
+    .reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0)) >>> 0, 7);
+
+  const Icon = m.kind === "dryer" ? DryerIcon : WasherIcon;
 
   return (
     <div
       className="group relative flex flex-col items-center"
       title={`${m.id} — ${m.rawLabel}`}
     >
-      {/* Outer machine body */}
-      <div
-        className={`relative aspect-square w-full rounded-full ring-1 ${p.ringOuter} ${p.bgOuter} shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-transform duration-200 group-hover:-translate-y-0.5`}
-      >
-        {/* Inner chrome ring */}
-        <div className="absolute inset-[10%] rounded-full ring-1 ring-paper/15">
-          {/* Drum (rotates when busy) */}
-          <div
-            className={`absolute inset-[8%] rounded-full bg-linear-to-br ${p.drumGrad} ring-1 ${p.drumRing} ${
-              status === "busy"
-                ? "animate-[spin_18s_linear_infinite]"
-                : status === "available"
-                  ? ""
-                  : ""
-            }`}
-            style={{
-              backgroundImage: `radial-gradient(circle at 50% 50%, rgba(255,255,255,0.06) 1.6px, transparent 1.8px), radial-gradient(circle at 30% 30%, rgba(255,255,255,0.07) 1px, transparent 1.2px), radial-gradient(circle at 70% 30%, rgba(255,255,255,0.07) 1px, transparent 1.2px), radial-gradient(circle at 30% 70%, rgba(255,255,255,0.07) 1px, transparent 1.2px), radial-gradient(circle at 70% 70%, rgba(255,255,255,0.07) 1px, transparent 1.2px)`,
-              backgroundSize: "100% 100%",
-            }}
-            aria-hidden="true"
-          />
+      <div className="relative aspect-square w-full transition-transform duration-200 group-hover:-translate-y-0.5">
+        <Icon status={status as MachineStatusVisual} seed={seed} />
 
-          {/* Center text/pip */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            {showCountdown ? (
-              <span
-                className={`rounded-md bg-ink/75 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums shadow-md md:text-xs ${p.label}`}
-              >
-                {fmtCountdown(m.liveSeconds!)}
-              </span>
-            ) : status === "available" ? (
-              <span
-                className={`size-1.5 rounded-full ${p.pip} ${status === "available" ? "animate-pulse" : ""}`}
-              />
-            ) : status === "offline" ? (
-              <span className="text-[10px] text-zinc-500">×</span>
-            ) : null}
+        {/* Countdown badge floats over the drum for busy machines */}
+        {showCountdown && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span
+              className={`rounded-md bg-ink/85 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums shadow-md md:text-xs ${p.text}`}
+            >
+              {fmtCountdown(m.liveSeconds!)}
+            </span>
           </div>
-        </div>
-
-        {/* Subtle glow on hover */}
-        <div
-          aria-hidden="true"
-          className="absolute -inset-1 rounded-full bg-brand/0 transition group-hover:bg-brand/10"
-        />
+        )}
       </div>
 
-      <span
-        className={`mt-2 font-mono text-[10px] tracking-tight md:text-xs ${p.label}`}
-      >
+      <span className={`mt-2 font-mono text-[10px] tracking-tight md:text-xs ${p.text}`}>
         {m.id}
       </span>
     </div>
