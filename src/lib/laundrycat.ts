@@ -68,7 +68,50 @@ type RawMachine = {
   colour?: string;
   is_online?: boolean;
   show_timer?: boolean;
+  /** Naive "YYYY-MM-DD HH:MM:SS" in LaundryCat's server timezone (Eastern).
+   *  For a busy machine, this is when the current cycle started. */
+  Status_Timestamp?: string;
 };
+
+/**
+ * Parse a naive LaundryCat timestamp ("YYYY-MM-DD HH:MM:SS") as US Eastern
+ * time (America/New_York). LaundryCat serves timestamps without a timezone
+ * suffix, but empirical testing (cycle-end transitions and comparison with
+ * the kiosk display) shows their server is on Eastern time. Handles both
+ * EST (UTC-5) and EDT (UTC-4) automatically via Intl.
+ */
+export function parseLaundryCatTimestamp(v: unknown): Date | null {
+  if (typeof v !== "string" || v.length === 0) return null;
+  const cleaned = v.replace(" ", "T");
+  // First parse the string as if it were UTC.
+  const naiveUtc = new Date(cleaned + (cleaned.endsWith("Z") ? "" : "Z"));
+  if (isNaN(naiveUtc.getTime())) return null;
+  // Then subtract the Eastern offset applicable at that instant so we land
+  // on the correct absolute UTC moment.
+  const offsetMinutes = easternOffsetMinutesAt(naiveUtc);
+  return new Date(naiveUtc.getTime() - offsetMinutes * 60_000);
+}
+
+// Returns the offset of America/New_York from UTC in minutes at the given
+// instant (e.g. -240 during EDT, -300 during EST).
+function easternOffsetMinutesAt(instant: Date): number {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      timeZoneName: "shortOffset",
+    }).formatToParts(instant);
+    const tz =
+      parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+0";
+    const m = tz.match(/GMT([+-])(\d+)(?::(\d+))?/);
+    if (!m) return -300; // safe fallback: EST
+    const sign = m[1] === "-" ? -1 : 1;
+    const hours = parseInt(m[2] ?? "0", 10);
+    const mins = parseInt(m[3] ?? "0", 10);
+    return sign * (hours * 60 + mins);
+  } catch {
+    return -300;
+  }
+}
 
 type RawLocation = {
   location_id: string;
@@ -112,18 +155,39 @@ function machineFromRaw(raw: RawMachine): Machine {
   const rawLabel = raw.display_status ?? "Unknown";
   const status = classifyStatus(rawLabel, isOnline);
 
-  // The portal ships RemainingTime{Mins,Secs} for every washer/dryer, but it
-  // only matters when the machine is busy and `show_timer` is true. Idle
-  // washers regularly carry a stale "23:00" countdown; we treat those as null.
+  // The portal ships RemainingTime{Mins,Secs} for every washer/dryer, but
+  // that value is the machine's TOTAL programmed cycle duration — it does
+  // not decrement across polls. Empirical proof: for a busy machine we've
+  // observed identical 23:31 values across consecutive polls 60+ seconds
+  // apart. The kiosk shows real remaining time as
+  //   Status_Timestamp + RemainingTime - now
+  // so that's exactly what we compute here.
+  //
+  // Historical note: an earlier version stored `endsAt = now + Remaining`,
+  // which for a fresh scrape would over-report remaining time by the
+  // elapsed cycle time. It looked correct at cycle start (before any time
+  // had passed) but drifted worse the longer a cycle ran.
   let remainingSeconds: number | null = null;
   let endsAt: string | null = null;
   const showTimer = raw.show_timer ?? false;
   if (status === "busy" && showTimer) {
-    const m = Number(raw.RemainingTimeMins ?? 0);
-    const s = Number(raw.RemainingTimeSecs ?? 0);
-    remainingSeconds = m * 60 + s;
-    if (remainingSeconds > 0) {
-      endsAt = new Date(Date.now() + remainingSeconds * 1000).toISOString();
+    const durationMins = Number(raw.RemainingTimeMins ?? 0);
+    const durationSecs = Number(raw.RemainingTimeSecs ?? 0);
+    const durationTotal = durationMins * 60 + durationSecs;
+    const cycleStart = parseLaundryCatTimestamp(raw.Status_Timestamp);
+    if (durationTotal > 0 && cycleStart) {
+      const endsAtMs = cycleStart.getTime() + durationTotal * 1000;
+      endsAt = new Date(endsAtMs).toISOString();
+      remainingSeconds = Math.max(
+        0,
+        Math.round((endsAtMs - Date.now()) / 1000),
+      );
+    } else if (durationTotal > 0) {
+      // Fallback for machines with no Status_Timestamp (shouldn't happen
+      // for real Speed Queen units, but the reader mgmt companions could).
+      // Best guess: assume the cycle just started.
+      remainingSeconds = durationTotal;
+      endsAt = new Date(Date.now() + durationTotal * 1000).toISOString();
     }
   }
 

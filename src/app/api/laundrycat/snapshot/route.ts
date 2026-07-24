@@ -18,6 +18,7 @@ import { db } from "@/lib/db";
 import { kv, KV_KEYS } from "@/lib/kv";
 import {
   inferLocationSlug,
+  parseLaundryCatTimestamp,
   snapshotFromJson,
   type LocationSnapshot,
 } from "@/lib/laundrycat";
@@ -314,13 +315,13 @@ function bigIntOrNull(v: unknown): bigint | null {
   return null;
 }
 
+// Delegate to the shared parser so all naive LaundryCat timestamps get the
+// same Eastern-time interpretation as the countdown math in laundrycat.ts.
+// Rejecting the epoch fallback keeps blank strings out of the DB as bogus
+// 1970 rows.
 function parseTimestamp(v: unknown): Date | null {
-  if (typeof v !== "string" || v.length === 0) return null;
-  // LaundryCat ships timestamps like "2024-11-14 08:22:31" (naive local) or
-  // ISO — Date handles both, but reject the epoch fallback so we don't
-  // store bogus 1970 rows for empty strings that slip through.
-  const d = new Date(v.includes("T") ? v : v.replace(" ", "T") + "Z");
-  return isNaN(d.getTime()) || d.getTime() === 0 ? null : d;
+  const d = parseLaundryCatTimestamp(v);
+  return d && d.getTime() !== 0 ? d : null;
 }
 
 async function storeSnapshot(slug: string, snapshot: LocationSnapshot) {
