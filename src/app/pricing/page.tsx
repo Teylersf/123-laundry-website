@@ -34,7 +34,7 @@ export default function PricingPage() {
         <Card className="bg-brand-50/60">
           <h2 className="font-display text-xl font-bold">We take whatever you have on you.</h2>
           <p className="mt-2 text-ink/75">
-            Our kiosks accept cash, EBT, debit and credit cards, plus contactless phone tap pay (Apple Pay and Google Pay).
+            Our kiosks accept cash, EBT, debit and credit cards, plus contactless phone tap pay (Apple Pay, Google Pay, and Samsung Pay).
           </p>
           <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {PAYMENT_METHODS.map((p) => (

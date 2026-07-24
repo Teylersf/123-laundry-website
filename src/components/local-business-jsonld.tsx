@@ -38,7 +38,7 @@ export function LocalBusinessJsonLd() {
       },
     ],
     priceRange: "$",
-    paymentAccepted: "Cash, EBT, debit card, credit card, Apple Pay, Google Pay (loaded onto a reloadable 123 Laundry card)",
+    paymentAccepted: "Cash, EBT, debit card, credit card, Apple Pay, Google Pay, Samsung Pay (loaded onto a reloadable 123 Laundry card)",
     currenciesAccepted: "USD",
     sameAs: [BUSINESS.social.facebook, BUSINESS.social.instagram],
     additionalProperty: [

@@ -144,7 +144,7 @@ export const PAYMENT_METHODS = [
     blurb: "Tap, swipe, or insert any major debit or credit card.",
   },
   {
-    name: "Phone tap (Apple Pay / Google Pay)",
+    name: "Phone tap (Apple Pay / Google Pay / Samsung Pay)",
     blurb: "Hold your phone or smart watch to the kiosk reader and you're done.",
   },
 ];
@@ -589,7 +589,7 @@ export const FAQ = [
   },
   {
     q: "What payment methods do you accept?",
-    a: "Our kiosks accept cash, EBT, debit and credit cards, and contactless phone tap pay (Apple Pay and Google Pay). Whatever you have on you, we'll take it — and load it onto your reloadable 123 Laundry card.",
+    a: "Our kiosks accept cash, EBT, debit and credit cards, and contactless phone tap pay (Apple Pay, Google Pay, and Samsung Pay). Whatever you have on you, we'll take it — and load it onto your reloadable 123 Laundry card.",
   },
   {
     q: "When are you open?",
