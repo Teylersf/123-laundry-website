@@ -96,45 +96,63 @@ h6 {
 /*  Live machine status — washer / dryer animations                            */
 /* -------------------------------------------------------------------------- */
 
-/* Washer drum: continuous spin with a slight wobble so it doesn't look like
-   a boring wheel. Slower than a real spin cycle so it reads across the grid
-   without turning into a strobe. */
-@keyframes machine-spin {
-  0%   { transform: rotate(0deg)   translate(0, 0); }
-  25%  { transform: rotate(90deg)  translate(0.3%, -0.3%); }
-  50%  { transform: rotate(180deg) translate(0, 0); }
-  75%  { transform: rotate(270deg) translate(-0.3%, 0.3%); }
-  100% { transform: rotate(360deg) translate(0, 0); }
+/* Every animated child of a machine icon needs `transform-box: fill-box`
+   with `transform-origin: center` — otherwise iOS Safari applies rotations
+   and scales around the SVG viewport's (0,0) point instead of the element's
+   own center, which throws the drum, water, bubbles, halo, and steam wildly
+   off-screen and makes it look like "the animations don't work on mobile".
+   Applying this to every animated child of `.machine-anim` catches the whole
+   set in one rule and stays robust as we add new machine parts. */
+.machine-anim [style*="animation"] {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
-/* Dryer tumble — one full rotation per cycle but staggered so a row of
-   dryers doesn't animate in perfect lockstep (each drum has its own delay). */
+/* Washer drum: continuous spin. Slower than a real spin cycle so it reads
+   across the grid without turning into a strobe. Using pixel translates
+   (not percentages) keeps the tiny wobble consistent across browsers now
+   that fill-box is applied — percentages would be % of the drum's own
+   bounding box, which is too small to see. */
+@keyframes machine-spin {
+  0%   { transform: rotate(0deg)   translate(0px, 0px); }
+  25%  { transform: rotate(90deg)  translate(0.5px, -0.5px); }
+  50%  { transform: rotate(180deg) translate(0px, 0px); }
+  75%  { transform: rotate(270deg) translate(-0.5px, 0.5px); }
+  100% { transform: rotate(360deg) translate(0px, 0px); }
+}
+
+/* Dryer tumble — one full rotation per cycle. Each drum gets its own delay
+   in the component so a row doesn't animate in perfect lockstep. */
 @keyframes machine-tumble {
   0%   { transform: rotate(0deg); }
   100% { transform: rotate(-360deg); }
 }
 
 /* Water line inside the washer window: rises + falls like a load agitating.
-   Uses translateY on a filled rect that clips through the porthole SVG. */
+   Absolute pixel translations so the motion is meaningful under fill-box
+   (which makes % refer to the rect's own 26-unit height). */
 @keyframes machine-water {
-  0%, 100% { transform: translateY(35%); }
-  25%      { transform: translateY(30%); }
-  50%      { transform: translateY(45%); }
-  75%      { transform: translateY(32%); }
+  0%, 100% { transform: translateY(9px); }
+  25%      { transform: translateY(7px); }
+  50%      { transform: translateY(13px); }
+  75%      { transform: translateY(8px); }
 }
 
-/* Bubbles rising through the washer water — three staggered pips. */
+/* Bubbles rising through the washer water — three staggered pips. Absolute
+   pixels so they actually travel across the drum instead of moving a
+   fraction of their own 3-pixel diameter under fill-box. */
 @keyframes machine-bubble {
-  0%   { transform: translateY(20%); opacity: 0; }
+  0%   { transform: translateY(4px);   opacity: 0; }
   25%  { opacity: 0.9; }
-  100% { transform: translateY(-90%); opacity: 0; }
+  100% { transform: translateY(-24px); opacity: 0; }
 }
 
-/* Heat wisps rising above a busy dryer — vertical drift + fade. */
+/* Heat wisps rising above a busy dryer — vertical drift + fade. Absolute
+   pixels for the same reason as bubbles. */
 @keyframes machine-steam {
-  0%   { transform: translateY(0) scale(0.7); opacity: 0; }
+  0%   { transform: translateY(0px)  scale(0.7); opacity: 0; }
   30%  { opacity: 0.5; }
-  100% { transform: translateY(-140%) scale(1.2); opacity: 0; }
+  100% { transform: translateY(-14px) scale(1.2); opacity: 0; }
 }
 
 /* Available state — subtle "breathing" glow so it reads as ready. */

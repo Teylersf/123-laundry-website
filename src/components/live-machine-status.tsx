@@ -535,10 +535,10 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
       <circle cx="74" cy="17" r="1.6" className="fill-white/20" />
       {/* Porthole outer */}
       <circle cx="50" cy="58" r="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
-      {/* Drum window — spinning + water */}
+      {/* Drum window — spinning + water. Origin comes from the .machine-anim
+          fill-box rule in globals.css so it works on iOS Safari. */}
       <g
         style={{
-          transformOrigin: "50px 58px",
           animation: busy ? `machine-spin 6s linear infinite ${spinDelay}s` : undefined,
         }}
       >
@@ -569,7 +569,6 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
             height="26"
             className="fill-brand-400/45"
             style={{
-              transformOrigin: "50px 70px",
               animation: `machine-water 3.4s ease-in-out infinite ${(-seed % 3)}s`,
             }}
           />
@@ -582,7 +581,6 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
               r={1.4 + (i % 2) * 0.6}
               className="fill-white/70"
               style={{
-                transformOrigin: `${42 + i * 7}px 76px`,
                 animation: `machine-bubble ${2.4 + i * 0.6}s ease-in infinite ${-((seed + i) % 4)}s`,
               }}
             />
@@ -600,7 +598,6 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
           className="fill-none stroke-emerald-300/70"
           strokeWidth={0.8}
           style={{
-            transformOrigin: "50px 58px",
             animation: `machine-breathe 3.4s ease-in-out infinite ${-(seed % 3)}s`,
           }}
         />
@@ -638,7 +635,6 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
               ry={3.5 + i * 0.6}
               className="fill-white/25"
               style={{
-                transformOrigin: `${30 + i * 20}px 4px`,
                 animation: `machine-steam ${3 + i * 0.7}s ease-out infinite ${-((seed + i) % 4)}s`,
               }}
             />
@@ -657,7 +653,6 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
       {/* Tumbling drum */}
       <g
         style={{
-          transformOrigin: "50px 61px",
           animation: busy ? `machine-tumble 7s linear infinite ${tumbleDelay}s` : undefined,
         }}
       >
@@ -711,7 +706,6 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
           className="fill-none stroke-emerald-300/70"
           strokeWidth={0.8}
           style={{
-            transformOrigin: "50px 61px",
             animation: `machine-breathe 3.4s ease-in-out infinite ${-(seed % 3)}s`,
           }}
         />
