@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdminSessionOrRedirect } from "@/lib/admin-auth";
 import { LOCATION_LIST } from "@/lib/site-data";
+import { parseRange, type ActiveRange } from "./_range";
+import { RangePicker } from "./_range-picker";
 
 export const metadata: Metadata = {
   title: "Admin dashboard — 123 Laundry",
@@ -13,67 +14,6 @@ export const metadata: Metadata = {
 // The admin surface is data-driven — never precompute.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-// ---------- Time-range picker ----------------------------------------------
-// The owner asked for analytics across many time windows (day, week, month,
-// quarter, year, all-time, custom). We drive everything off ?range= or an
-// explicit ?from=&to=. Data is never pruned, so "all" scans the full history.
-type RangeKey = "1d" | "7d" | "30d" | "90d" | "1y" | "all" | "custom";
-const RANGES: { key: Exclude<RangeKey, "custom">; label: string; days: number | null }[] = [
-  { key: "1d", label: "24h", days: 1 },
-  { key: "7d", label: "7d", days: 7 },
-  { key: "30d", label: "30d", days: 30 },
-  { key: "90d", label: "90d", days: 90 },
-  { key: "1y", label: "1y", days: 365 },
-  { key: "all", label: "All time", days: null },
-];
-
-type ActiveRange = {
-  key: RangeKey;
-  label: string;
-  from: Date | null; // null = beginning of time
-  to: Date | null;   // null = now
-  customFromIso?: string;
-  customToIso?: string;
-};
-
-function parseIsoDate(v: string | undefined): Date | null {
-  if (!v) return null;
-  // Accept plain YYYY-MM-DD (treated as UTC midnight) or full ISO.
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00Z`) : new Date(v);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-function parseRange(sp: {
-  range?: string;
-  from?: string;
-  to?: string;
-}): ActiveRange {
-  const from = parseIsoDate(sp.from);
-  const to = parseIsoDate(sp.to);
-  if (from && to && to > from) {
-    return {
-      key: "custom",
-      label: `${sp.from} → ${sp.to}`,
-      from,
-      to,
-      customFromIso: sp.from,
-      customToIso: sp.to,
-    };
-  }
-  const picked =
-    RANGES.find((r) => r.key === sp.range) ??
-    RANGES.find((r) => r.key === "30d")!;
-  if (picked.days === null) {
-    return { key: picked.key, label: picked.label, from: null, to: null };
-  }
-  return {
-    key: picked.key,
-    label: picked.label,
-    from: new Date(Date.now() - picked.days * 24 * 60 * 60 * 1000),
-    to: null,
-  };
-}
 
 // SQL fragment for the WHERE clause. Empty when "all time" so Postgres does
 // not add a bogus lower bound.
@@ -453,8 +393,14 @@ export default async function AdminDashboard(
         </p>
       </div>
 
-      <RangePicker active={range} />
-
+      {/* ============================ LIVE ============================
+          Current state of the stores. Numbers here reflect the most
+          recent poll — they don't depend on the historical range picker
+          below. */}
+      <SectionDivider
+        label="Live · right now"
+        hint="Current state as of the last poll. Not affected by the time-range picker below."
+      />
 
       {/* PIPELINE STATUS */}
       <Card
@@ -557,46 +503,71 @@ export default async function AdminDashboard(
         );
       })}
 
-      {/* ERROR TRACKER */}
-      <Card
-        title={`Errors — ${range.label}`}
-        subtitle="Any machine that reported a non-zero error code inside the selected window. Most recent first, top 50."
-      >
-        {errors.length === 0 ? (
-          <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">
-            No error codes in the observation history. All machines healthy.
-          </p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {errors.slice(0, 20).map((e, idx) => (
-              <li
-                key={`${e.capturedAt.toISOString()}-${e.machineNumber}-${idx}`}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2 text-sm"
-              >
-                <span className="font-mono text-xs text-white/50">
-                  {e.capturedAt.toLocaleString()}
-                </span>
-                <span className="text-white">
-                  <b>{e.machineNumber}</b>{" "}
-                  <span className="text-white/50">
-                    ({e.locationSlug ?? "?"})
-                  </span>
-                </span>
-                <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs text-red-300">
-                  {[e.errorCode1, e.errorCode2, e.errorCode3]
-                    .filter((c) => c != null && c !== 0)
-                    .join(" / ")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      {/* MACHINE ROSTER (live — one card per store) */}
+      {Array.from(byLocation.entries()).map(([slug, rows]) => {
+        if (rows.length === 0) return null;
+        const loc = LOCATION_LIST.find((l) => l.slug === slug);
+        return (
+          <Card
+            key={`roster-${slug}`}
+            title={`Machine roster — ${loc?.city ?? slug}`}
+            subtitle="Current state of every machine. Sorted by number."
+          >
+            <ul className="divide-y divide-white/5">
+              {rows
+                .slice()
+                .sort((a, b) => a.machineNumber.localeCompare(b.machineNumber))
+                .map((m) => (
+                  <li
+                    key={`${slug}-${m.machineNumber}`}
+                    className="grid grid-cols-[minmax(0,72px)_1fr_auto] items-center gap-3 py-2.5 text-sm"
+                  >
+                    <div>
+                      <div className="font-mono text-base font-bold text-white">
+                        {m.machineNumber}
+                      </div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/50">
+                        {m.kind}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <StatusPill status={m.status} isOnline={m.isOnline} />
+                      {m.status === "busy" && m.remainingSeconds != null && (
+                        <span className="ml-2 text-xs text-white/60">
+                          {formatDuration(m.remainingSeconds * 1000)} left
+                        </span>
+                      )}
+                      {m.statusTimestamp && (
+                        <div className="mt-0.5 truncate text-[11px] text-white/40">
+                          since{" "}
+                          {formatDuration(
+                            now - m.statusTimestamp.getTime(),
+                          )}{" "}
+                          ago
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right text-[11px] text-white/40">
+                      {typeof m.rssi === "number" && (
+                        <div>RSSI {m.rssi}</div>
+                      )}
+                      {m.isFirmwareUpdatePending && (
+                        <div className="text-amber-200">FW pending</div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </Card>
+        );
+      })}
 
-      {/* UTILIZATION */}
+      {/* TODAY'S RHYTHM — fixed 24h view, doesn't respond to the picker.
+          Kept in the LIVE section because "the last day" reads as current
+          activity to the owner, not as a historical trend. */}
       <Card
-        title="Utilization (last 24h)"
-        subtitle="Share of machines busy, bucketed by hour and by kind."
+        title="Today's rhythm — last 24h"
+        subtitle="Share of machines busy, bucketed by hour and by kind. Fixed 24-hour view."
       >
         {util.length === 0 ? (
           <p className="text-sm text-white/60">
@@ -606,6 +577,16 @@ export default async function AdminDashboard(
           <UtilChart util={util} />
         )}
       </Card>
+
+      {/* ========================= HISTORICAL =========================
+          Everything below responds to the RangePicker. Loading state is
+          shown inside the picker so it's obvious a query is in flight. */}
+      <SectionDivider
+        label="Historical analytics"
+        hint="Pick a window and every card below updates. Watch the spinner in the picker so you know when it's done."
+      />
+
+      <RangePicker active={range} />
 
       {/* USAGE RANKING */}
       <Card
@@ -695,140 +676,58 @@ export default async function AdminDashboard(
         )}
       </Card>
 
-      {/* MACHINE ROSTER */}
-      {Array.from(byLocation.entries()).map(([slug, rows]) => {
-        if (rows.length === 0) return null;
-        const loc = LOCATION_LIST.find((l) => l.slug === slug);
-        return (
-          <Card
-            key={`roster-${slug}`}
-            title={`Machine roster — ${loc?.city ?? slug}`}
-            subtitle="Current state of every machine. Sorted by number."
-          >
-            <ul className="divide-y divide-white/5">
-              {rows
-                .slice()
-                .sort((a, b) => a.machineNumber.localeCompare(b.machineNumber))
-                .map((m) => (
-                  <li
-                    key={`${slug}-${m.machineNumber}`}
-                    className="grid grid-cols-[minmax(0,72px)_1fr_auto] items-center gap-3 py-2.5 text-sm"
-                  >
-                    <div>
-                      <div className="font-mono text-base font-bold text-white">
-                        {m.machineNumber}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/50">
-                        {m.kind}
-                      </div>
-                    </div>
-                    <div className="min-w-0">
-                      <StatusPill status={m.status} isOnline={m.isOnline} />
-                      {m.status === "busy" && m.remainingSeconds != null && (
-                        <span className="ml-2 text-xs text-white/60">
-                          {formatDuration(m.remainingSeconds * 1000)} left
-                        </span>
-                      )}
-                      {m.statusTimestamp && (
-                        <div className="mt-0.5 truncate text-[11px] text-white/40">
-                          since{" "}
-                          {formatDuration(
-                            now - m.statusTimestamp.getTime(),
-                          )}{" "}
-                          ago
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right text-[11px] text-white/40">
-                      {typeof m.rssi === "number" && (
-                        <div>RSSI {m.rssi}</div>
-                      )}
-                      {m.isFirmwareUpdatePending && (
-                        <div className="text-amber-200">FW pending</div>
-                      )}
-                    </div>
-                  </li>
-                ))}
-            </ul>
-          </Card>
-        );
-      })}
+      {/* ERROR TRACKER (scoped to picker window) */}
+      <Card
+        title={`Errors — ${range.label}`}
+        subtitle="Any machine that reported a non-zero error code inside the selected window. Most recent first, top 50."
+      >
+        {errors.length === 0 ? (
+          <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">
+            No error codes in this window. All machines healthy.
+          </p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {errors.slice(0, 20).map((e, idx) => (
+              <li
+                key={`${e.capturedAt.toISOString()}-${e.machineNumber}-${idx}`}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2 text-sm"
+              >
+                <span className="font-mono text-xs text-white/50">
+                  {e.capturedAt.toLocaleString()}
+                </span>
+                <span className="text-white">
+                  <b>{e.machineNumber}</b>{" "}
+                  <span className="text-white/50">
+                    ({e.locationSlug ?? "?"})
+                  </span>
+                </span>
+                <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs text-red-300">
+                  {[e.errorCode1, e.errorCode2, e.errorCode3]
+                    .filter((c) => c != null && c !== 0)
+                    .join(" / ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 }
 
-// Mobile-first range chips + collapsible custom date form. Each chip is a
-// plain link that swaps ?range=; no JS needed. Custom form is a GET so it
-// also works without JS and shows up in the address bar (bookmarkable).
-function RangePicker({ active }: { active: ActiveRange }) {
+// Visual break between the "live / right now" cards and the range-picker-
+// driven historical analytics section. Big enough to signal a section
+// change on mobile without spending a full card of vertical space.
+function SectionDivider({ label, hint }: { label: string; hint?: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-ink-soft p-3 md:p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/60">
-          Time range
-        </p>
-        <p className="text-[11px] text-white/40">
-          {active.key === "custom" ? "Custom" : `Showing: ${active.label}`}
-        </p>
+    <div className="pt-2">
+      <div className="mb-2 flex items-center gap-3">
+        <span className="font-display text-xs font-bold uppercase tracking-[0.24em] text-brand-200">
+          {label}
+        </span>
+        <span className="h-px flex-1 bg-linear-to-r from-brand-200/40 to-transparent" />
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {RANGES.map((r) => {
-          const isActive = active.key === r.key;
-          return (
-            <Link
-              key={r.key}
-              href={`/admin?range=${r.key}`}
-              prefetch={false}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                isActive
-                  ? "border-brand-200 bg-brand-200/20 text-brand-100"
-                  : "border-white/15 text-white/70 hover:border-white/30 hover:text-white"
-              }`}
-            >
-              {r.label}
-            </Link>
-          );
-        })}
-      </div>
-      <details className="mt-3 group" open={active.key === "custom"}>
-        <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wider text-white/50 hover:text-white/80">
-          Custom date range
-          <span className="ml-1 text-white/30 group-open:hidden">▾</span>
-          <span className="ml-1 text-white/30 hidden group-open:inline">▴</span>
-        </summary>
-        <form
-          action="/admin"
-          method="get"
-          className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]"
-        >
-          <label className="flex flex-col gap-1 text-[11px] text-white/60">
-            From
-            <input
-              type="date"
-              name="from"
-              defaultValue={active.customFromIso ?? ""}
-              className="rounded-lg border border-white/15 bg-ink px-2 py-1.5 text-sm text-white scheme-dark"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-[11px] text-white/60">
-            To
-            <input
-              type="date"
-              name="to"
-              defaultValue={active.customToIso ?? ""}
-              className="rounded-lg border border-white/15 bg-ink px-2 py-1.5 text-sm text-white scheme-dark"
-              required
-            />
-          </label>
-          <button
-            type="submit"
-            className="self-end rounded-lg bg-brand-200 px-3 py-2 text-xs font-bold text-ink hover:bg-brand-100"
-          >
-            Apply
-          </button>
-        </form>
-      </details>
+      {hint && <p className="text-[11px] text-white/40">{hint}</p>}
     </div>
   );
 }
