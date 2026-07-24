@@ -77,10 +77,38 @@ const TOKEN = env.ADMIN_INGEST_TOKEN;
 const INTERVAL_SEC = Number(env.LAUNDRYCAT_RELAY_INTERVAL_SEC) || 60;
 const CHANNEL = env.LAUNDRYCAT_RELAY_CHANNEL ?? "chrome";
 const HEADLESS = env.LAUNDRYCAT_RELAY_HEADLESS === "true";
+
+// Per-location multi-tenant support. Each LaundryCat card is tied to one
+// store, so we run one relay per location, each with its own persistent
+// Chromium profile so their sessions don't collide. Accepts either the env
+// var or --location=<slug> on argv (works uniformly across bash + pwsh).
+// Leave both unset for the legacy single-tenant behavior.
+const LOCATION_FROM_ARGV = (() => {
+  const hit = process.argv.find((a) => a.startsWith("--location="));
+  return hit ? hit.slice("--location=".length) : "";
+})();
+const LOCATION =
+  (LOCATION_FROM_ARGV || env.LAUNDRYCAT_RELAY_LOCATION || "").toLowerCase() ||
+  null;
 const PROFILE_DIR =
   env.LAUNDRYCAT_RELAY_PROFILE_DIR ??
-  path.join(ROOT, ".laundrycat-relay-profile");
+  path.join(
+    ROOT,
+    LOCATION
+      ? `.laundrycat-relay-profile-${LOCATION}`
+      : ".laundrycat-relay-profile",
+  );
 mkdirSync(PROFILE_DIR, { recursive: true });
+
+// Card number to display in the sign-in prompt when we detect we're on
+// LaundryCat's /login page. Purely a UI convenience — the sign-in itself is
+// the human typing the card at the keyboard.
+const CARD_FOR_PROMPT =
+  (LOCATION === "deer-park"
+    ? env.LAUNDRYCAT_CARD_DEER_PARK
+    : LOCATION === "spokane-valley"
+    ? env.LAUNDRYCAT_CARD_SPOKANE_VALLEY
+    : env.LAUNDRYCAT_CARD_NUMBER) ?? "(no card configured)";
 
 // ----- pretty logging --------------------------------------------------------
 const C = {
@@ -147,6 +175,9 @@ async function applyStealth(context) {
 async function main() {
   console.log("");
   console.log(`${C.bold}${C.cyan}123 Laundry · live-data relay${C.reset}`);
+  if (LOCATION) {
+    console.log(`  location:       ${C.bold}${LOCATION}${C.reset}`);
+  }
   console.log(`  webhook:        ${WEBHOOK}`);
   console.log(`  poll interval:  every ${INTERVAL_SEC}s`);
   console.log(`  browser:        ${CHANNEL}${HEADLESS ? " (headless)" : " (headed)"}`);
@@ -231,7 +262,9 @@ async function main() {
       new URL(page.url()).pathname === "/"
     ) {
       warn(
-        `not signed in — please sign in manually in the open window. Card: ${C.cyan}4153599252${C.reset}`,
+        `not signed in — please sign in manually in the open window. Card: ${C.cyan}${CARD_FOR_PROMPT}${C.reset}${
+          LOCATION ? ` ${C.dim}(${LOCATION})${C.reset}` : ""
+        }`,
       );
       warn(`The script will detect the redirect automatically.`);
       try {

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "laundrycat:relay": "node scripts/laundrycat-relay.mjs"
+    "laundrycat:relay": "node scripts/laundrycat-relay.mjs",
+    "laundrycat:relay:spokane-valley": "node scripts/laundrycat-relay.mjs --location=spokane-valley",
+    "laundrycat:relay:deer-park": "node scripts/laundrycat-relay.mjs --location=deer-park"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

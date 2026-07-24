@@ -36,8 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
-# laundrycat relay daemon — local browser profile, never commit
-/.laundrycat-relay-profile/
+# laundrycat relay daemon — local browser profiles (one per location),
+# never commit; they hold auth state and are locked by the running browser
+/.laundrycat-relay-profile*/
 
 # typescript
 *.tsbuildinfo
