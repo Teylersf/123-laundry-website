@@ -62,7 +62,6 @@ export function LocalBusinessJsonLd() {
         name: BUSINESS.name,
         url: SITE_URL,
         logo: `${SITE_URL}/images/logo.png`,
-        founder: { "@type": "Person", name: BUSINESS.owners },
         foundingDate: BUSINESS.established,
         sameAs: [BUSINESS.social.facebook, BUSINESS.social.instagram],
         contactPoint: [

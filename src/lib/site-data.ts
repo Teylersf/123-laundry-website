@@ -13,7 +13,6 @@ export const BUSINESS = {
   shortDescription:
     "A clean, safe, modern laundromat with two locations in Eastern Washington — Deer Park and Spokane Valley. Card-based, family-owned, and built for people who actually like clean laundromats.",
   established: "2024",
-  owners: "Jake and Katie Duenich",
   phone: "(509) 951-8534",
   phoneRaw: "+15099518534",
   email: "hello@123-laundry.com",
@@ -268,12 +267,12 @@ export const STORY = {
   origin:
     'The name "123 Laundry" came from the owners\' four-year-old child: 1 — wash, 2 — dry, 3 — fold. It stuck.',
   founders:
-    "Jake Duenich is a Deer Park native who spent years on the road as a lineman before coming home to start a business with his wife Katie. They considered opening a laundromat in Branson, Missouri, then circled back to Jake's hometown instead.",
+    "A husband-and-wife team from Deer Park started 123 Laundry in 2024 after years of considering the idea — including a stint contemplating a location in Branson, Missouri — before circling back to their hometown.",
   building:
-    "The Deer Park location occupies the old Fackenthall building — a tire store dating back to the 1950s. Jake's general contracting company (JK PNW Investments) rebuilt the space in two months and four days, working alongside Diamondback Electric, Strum, and Gaiser Plumbing. They pulled up multiple layers of flooring, including at least one slab of concrete, and discovered a handwritten receipt stapled to a beam — now framed and on the wall.",
+    "The Deer Park location occupies the old Fackenthall building — a tire store dating back to the 1950s. The owners' general contracting company rebuilt the space in two months and four days, working alongside Diamondback Electric, Strum, and Gaiser Plumbing. They pulled up multiple layers of flooring, including at least one slab of concrete, and discovered a handwritten receipt stapled to a beam — now framed and on the wall.",
   community:
     "The other half of the Deer Park building hosts a Head Start center, opened in collaboration with Eastern Washington University.",
-  goal: 'Jake says the goal is simple: "have the cleanest laundromat in town."',
+  goal: 'The goal is simple: "have the cleanest laundromat in town."',
 };
 
 // Reviews/testimonials: do NOT fabricate. We point to the real review sources
@@ -480,7 +479,7 @@ export const SEO_LANDINGS: SeoLanding[] = [
       "Family-owned 123 Laundry is a modern, card-based laundromat in downtown Deer Park, WA. Open 6 AM – 9 PM every day. 22 S Vernon Ave, across from the Post Office.",
     primaryLocation: "deer-park",
     body: [
-      "Our Deer Park flagship is the original 123 Laundry — owner-operated by Jake and Katie Duenich since June 2024, in the historic Fackenthall building at 22 S Vernon Ave.",
+      "Our Deer Park flagship is the original 123 Laundry — family-owned and locally operated since June 2024, in the historic Fackenthall building at 22 S Vernon Ave.",
       "We rebuilt this 1950s tire shop into the cleanest laundromat in town. Polished surfaces, real ventilation, modern stainless machines, a complete soft water system feeding every washer, and an on-site attendant during most operating hours so you're never on your own.",
       "The card-based system is the easiest part: load any amount onto a 123 Laundry card at our touch-screen kiosk, then tap to start the washer or dryer. No quarters. Free Wi-Fi while you wait, plus a kids' literacy corner if you bring the family.",
       "Opt in at the kiosk and we'll text you when your washer is done — and again when your dryer finishes. Run errands across the street or down Main; come back to a perfectly-timed load.",

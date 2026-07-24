@@ -112,8 +112,8 @@ export function SiteFooter() {
       <div className="border-t border-paper/10">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 px-4 py-6 text-sm text-paper/60 md:flex-row md:items-center md:px-6">
           <p>
-            © {year} {BUSINESS.legalName}. All rights reserved. Owned and
-            operated by {BUSINESS.owners}, Deer Park, Washington.
+            © {year} {BUSINESS.legalName}. All rights reserved. Family-owned
+            and operated, Deer Park, Washington.
           </p>
           <p>
             Card management powered by{" "}

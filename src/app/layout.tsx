@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   },
   description: BUSINESS.shortDescription,
   applicationName: BUSINESS.name,
-  authors: [{ name: BUSINESS.owners }],
+  authors: [{ name: BUSINESS.legalName }],
   creator: BUSINESS.legalName,
   publisher: BUSINESS.legalName,
   keywords: [
