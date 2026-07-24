@@ -98,24 +98,6 @@ export default function HowItWorksPage() {
         </ul>
       </Section>
 
-      <Section className="bg-paper-soft">
-        <SectionEyebrow>Card management</SectionEyebrow>
-        <SectionHeading>Check your balance online, reload in store.</SectionHeading>
-        <p className="mt-4 max-w-3xl text-ink/75">
-          We use LaundryCat for card lookups. Check your balance and recent
-          transactions anytime from your phone or computer. Reloads are in
-          store only — top up at the kiosk in either location.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button href={BUSINESS.cardBalanceUrl} external>
-            Check card balance
-          </Button>
-          <Button href="/check-balance" variant="ghost">
-            More about LaundryCat
-          </Button>
-        </div>
-      </Section>
-
       <Section>
         <SectionEyebrow>Quick tips</SectionEyebrow>
         <SectionHeading>Five things first-timers love to know.</SectionHeading>

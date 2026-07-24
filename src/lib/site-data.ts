@@ -248,7 +248,7 @@ export const AMENITIES = [
   },
   {
     title: "Live machine status",
-    body: "See which washers and dryers are open or in use, right now, from the in-store kiosk or your phone. No more circling the room with a basket.",
+    body: "See which washers and dryers are open or in use, right now, from the homepage of this website. No more circling the room with a basket.",
   },
   {
     title: "On-site attendant",
@@ -617,7 +617,7 @@ export const FAQ = [
   },
   {
     q: "Are the machines big enough for a comforter?",
-    a: "Yes — especially at Spokane Valley, which features extra-large capacity washers built for comforters, blankets, and sleeping bags.",
+    a: "Yes — both locations feature extra-large capacity washers built for comforters, blankets, and sleeping bags.",
   },
   {
     q: "Do you have soft water?",
@@ -629,7 +629,7 @@ export const FAQ = [
   },
   {
     q: "Can I check which washers are open before I drive over?",
-    a: "Yes — we show live machine status on the in-store kiosk and on your phone. You can see which washers and dryers are running, which are open, and how much time is left on the active loads.",
+    a: "Yes — check the live machine status on the homepage of this website. You can see which washers and dryers are running, which are open, and how much time is left on the active loads.",
   },
   {
     q: "Are there bathrooms?",
@@ -641,7 +641,7 @@ export const FAQ = [
   },
   {
     q: "Are your machines big enough for a comforter or a sleeping bag?",
-    a: "Yes. Both locations have a mix of small, standard, and extra-large washers — the extra-large units are sized for comforters, blankets, and sleeping bags. Spokane Valley specifically features high-capacity machines built for those big loads.",
+    a: "Yes. Both locations have a mix of small, standard, and extra-large washers — the extra-large units are sized for comforters, blankets, and sleeping bags.",
   },
   {
     q: "How do I reload my card?",
