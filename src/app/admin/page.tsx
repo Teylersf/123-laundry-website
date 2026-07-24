@@ -47,6 +47,23 @@ type ErrorRow = {
   rawLabel: string;
 };
 
+// 30-day aggregate per machine. Every poll is one minute apart, so
+// busy_polls ≈ total minutes the machine was running in the window.
+// `cycles` counts distinct statusTimestamp values while busy — LaundryCat
+// updates statusTimestamp when a new cycle begins, so distinct values within
+// the busy state give us a good approximation of load count.
+type UsageRow = {
+  locationSlug: string | null;
+  machineNumber: string;
+  kind: string;
+  cycles: bigint;
+  busy_polls: bigint;
+  offline_polls: bigint;
+  error_polls: bigint;
+  total_polls: bigint;
+  worst_rssi: number | null;
+};
+
 async function loadDashboard() {
   // Latest observation per machine (per location) — DISTINCT ON keeps this to
   // one row per machine even with 60s-cadence writes.
@@ -102,6 +119,32 @@ async function loadDashboard() {
     ORDER BY 1
   `;
 
+  // Per-machine usage aggregate for the last 30 days. Everything the two
+  // analytics cards below need in a single scan.
+  const usage = await db.$queryRaw<UsageRow[]>`
+    SELECT
+      "locationSlug",
+      "machineNumber",
+      kind,
+      COALESCE(COUNT(DISTINCT "statusTimestamp") FILTER (
+        WHERE status = 'busy' AND "statusTimestamp" IS NOT NULL
+      ), 0)::bigint AS cycles,
+      SUM(CASE WHEN status = 'busy' THEN 1 ELSE 0 END)::bigint AS busy_polls,
+      SUM(CASE WHEN NOT "isOnline" THEN 1 ELSE 0 END)::bigint AS offline_polls,
+      SUM(CASE
+        WHEN ("errorCode1" IS NOT NULL AND "errorCode1" <> 0)
+          OR ("errorCode2" IS NOT NULL AND "errorCode2" <> 0)
+          OR ("errorCode3" IS NOT NULL AND "errorCode3" <> 0)
+        THEN 1 ELSE 0
+      END)::bigint AS error_polls,
+      COUNT(*)::bigint AS total_polls,
+      MIN("rssi") AS worst_rssi
+    FROM machine_observations
+    WHERE "capturedAt" > NOW() - INTERVAL '30 days'
+      AND kind IN ('washer', 'dryer')
+    GROUP BY "locationSlug", "machineNumber", kind
+  `;
+
   // Error events in the last 7 days — non-zero on any of the three codes.
   const errors = await db.$queryRaw<ErrorRow[]>`
     SELECT
@@ -130,7 +173,63 @@ async function loadDashboard() {
     },
     util,
     errors,
+    usage,
   };
+}
+
+// ---------- Usage / risk shaping -------------------------------------------
+type UsageMetric = {
+  slug: string | null;
+  id: string;
+  kind: string;
+  cycles: number;
+  busyMinutes: number;    // 1 poll ≈ 1 minute
+  offlineMinutes: number;
+  errorMinutes: number;
+  totalPolls: number;
+  offlinePct: number;
+  errorPct: number;
+  worstRssi: number | null;
+  // Composite repair-risk score. Weights are picked so a machine with any
+  // real error signal outranks a merely well-used machine, but sustained
+  // usage still contributes (moving parts wear out).
+  wearScore: number;
+};
+
+function toUsageMetrics(rows: UsageRow[]): UsageMetric[] {
+  return rows.map((r) => {
+    const total = Number(r.total_polls);
+    const busyMin = Number(r.busy_polls);
+    const offlineMin = Number(r.offline_polls);
+    const errorMin = Number(r.error_polls);
+    const cycles = Number(r.cycles);
+    const offlinePct = total > 0 ? offlineMin / total : 0;
+    const errorPct = total > 0 ? errorMin / total : 0;
+    const wearScore = cycles * 1 + errorMin * 5 + offlineMin * 2;
+    return {
+      slug: r.locationSlug,
+      id: r.machineNumber,
+      kind: r.kind,
+      cycles,
+      busyMinutes: busyMin,
+      offlineMinutes: offlineMin,
+      errorMinutes: errorMin,
+      totalPolls: total,
+      offlinePct,
+      errorPct,
+      worstRssi: r.worst_rssi,
+      wearScore,
+    };
+  });
+}
+
+function formatMinutes(mins: number): string {
+  if (!Number.isFinite(mins) || mins <= 0) return "0m";
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h}h ${mins % 60}m`;
+  const d = Math.floor(h / 24);
+  return `${d}d ${h % 24}h`;
 }
 
 function formatDuration(fromMs: number): string {
@@ -201,8 +300,29 @@ function Card({
 export default async function AdminDashboard() {
   await requireAdminSessionOrRedirect();
 
-  const { latestMachines, pipeline, util, errors } = await loadDashboard();
+  const { latestMachines, pipeline, util, errors, usage } = await loadDashboard();
   const now = Date.now();
+
+  const usageMetrics = toUsageMetrics(usage);
+  const usageByLocation = new Map<string, UsageMetric[]>();
+  for (const m of usageMetrics) {
+    const slug = m.slug ?? "unknown";
+    if (!usageByLocation.has(slug)) usageByLocation.set(slug, []);
+    usageByLocation.get(slug)!.push(m);
+  }
+  // Repair-risk watchlist: any machine that showed an error OR spent >5% of
+  // the window offline OR is in the top quartile of usage (heavy wear).
+  const cyclesSorted = [...usageMetrics].sort((a, b) => b.cycles - a.cycles);
+  const q1Cycles = cyclesSorted[Math.floor(cyclesSorted.length / 4)]?.cycles ?? 0;
+  const watchlist = usageMetrics
+    .filter(
+      (m) =>
+        m.errorMinutes > 0 ||
+        m.offlinePct > 0.05 ||
+        (q1Cycles > 0 && m.cycles >= q1Cycles),
+    )
+    .sort((a, b) => b.wearScore - a.wearScore)
+    .slice(0, 10);
 
   const knownSlugs = LOCATION_LIST.map((l) => l.slug);
   const byLocation = new Map<string, MachineRow[]>();
@@ -399,6 +519,94 @@ export default async function AdminDashboard() {
         )}
       </Card>
 
+      {/* USAGE RANKING */}
+      <Card
+        title="Machine usage — last 30 days"
+        subtitle="Which machines are pulling weight, which are barely touched. Cycles are load starts; run time is total minutes turning."
+      >
+        {usageMetrics.length === 0 ? (
+          <p className="text-sm text-white/60">
+            No usage data yet. Ranked lists appear as poll history builds up.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            {Array.from(usageByLocation.entries()).map(([slug, rows]) => {
+              const loc = LOCATION_LIST.find((l) => l.slug === slug);
+              return (
+                <div key={`usage-${slug}`}>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-brand-200">
+                    {loc?.city ?? slug}
+                  </h3>
+                  {(["washer", "dryer"] as const).map((kind) => (
+                    <UsageGroup
+                      key={`usage-${slug}-${kind}`}
+                      kind={kind}
+                      rows={rows.filter((r) => r.kind === kind)}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* REPAIR-RISK WATCHLIST */}
+      <Card
+        title="Repair-risk watchlist — last 30 days"
+        subtitle="Composite of cycles (wear), error events, and offline time. Higher score = more attention worth giving."
+      >
+        {watchlist.length === 0 ? (
+          <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">
+            No machines flagging. Once we have more history, the top wear +
+            repair-risk machines will appear here.
+          </p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {watchlist.map((m) => {
+              const reasons: string[] = [];
+              if (m.errorMinutes > 0)
+                reasons.push(`${m.errorMinutes}m in error`);
+              if (m.offlinePct > 0.05)
+                reasons.push(`${Math.round(m.offlinePct * 100)}% offline`);
+              if (m.cycles > 0) reasons.push(`${m.cycles} cycles`);
+              if (typeof m.worstRssi === "number" && m.worstRssi < -80)
+                reasons.push(`weak signal ${m.worstRssi} dBm`);
+              return (
+                <li
+                  key={`risk-${m.slug}-${m.id}`}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5 text-sm"
+                >
+                  <div>
+                    <div className="font-mono text-base font-bold text-white">
+                      {m.id}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-white/50">
+                      {m.kind} · {m.slug ?? "?"}
+                    </div>
+                  </div>
+                  <div className="min-w-0 text-xs text-white/70">
+                    {reasons.join(" · ")}
+                  </div>
+                  <div
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                      m.errorMinutes > 0
+                        ? "bg-red-500/20 text-red-200"
+                        : m.offlinePct > 0.05
+                          ? "bg-amber-400/20 text-amber-200"
+                          : "bg-white/10 text-white/70"
+                    }`}
+                    title="Composite wear-and-tear score"
+                  >
+                    {m.wearScore}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+
       {/* MACHINE ROSTER */}
       {Array.from(byLocation.entries()).map(([slug, rows]) => {
         if (rows.length === 0) return null;
@@ -457,6 +665,53 @@ export default async function AdminDashboard() {
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+// Compact horizontal-bar list for one (location, kind) slice. Sorts by
+// cycles desc so the busiest sit at the top; a small footer flags the
+// quietest machine in the group so the owner can spot underused units.
+function UsageGroup({ kind, rows }: { kind: "washer" | "dryer"; rows: UsageMetric[] }) {
+  if (rows.length === 0) return null;
+  const sorted = [...rows].sort((a, b) => b.cycles - a.cycles);
+  const maxCycles = Math.max(1, ...sorted.map((r) => r.cycles));
+  const busiest = sorted[0];
+  const quietest = sorted[sorted.length - 1];
+  return (
+    <div className="mb-4">
+      <div className="mb-1.5 flex items-baseline justify-between">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-white/60">
+          {kind}s
+        </h4>
+        <span className="text-[11px] text-white/40">
+          busiest {busiest.id} · quietest {quietest.id}
+        </span>
+      </div>
+      <ul className="space-y-1.5">
+        {sorted.map((m) => {
+          const pct = Math.round((m.cycles / maxCycles) * 100);
+          return (
+            <li
+              key={`ug-${m.slug}-${m.id}`}
+              className="grid grid-cols-[52px_1fr_auto] items-center gap-2 text-xs"
+            >
+              <span className="font-mono font-bold text-white">{m.id}</span>
+              <div className="relative h-2 rounded-full bg-white/5">
+                <div
+                  className={`absolute inset-y-0 left-0 rounded-full ${
+                    kind === "washer" ? "bg-brand-400" : "bg-amber-300"
+                  }`}
+                  style={{ width: `${Math.max(2, pct)}%` }}
+                />
+              </div>
+              <span className="whitespace-nowrap text-right text-white/70 tabular-nums">
+                {m.cycles} · {formatMinutes(m.busyMinutes)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
