@@ -231,7 +231,7 @@ async function main() {
       new URL(page.url()).pathname === "/"
     ) {
       warn(
-        `not signed in — please sign in manually in the open window. Card: ${C.cyan}695395634${C.reset}`,
+        `not signed in — please sign in manually in the open window. Card: ${C.cyan}4153599252${C.reset}`,
       );
       warn(`The script will detect the redirect automatically.`);
       try {
