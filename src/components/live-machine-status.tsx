@@ -125,7 +125,11 @@ export function LiveMachineStatus({ slug, heading, subheading }: LiveProps = {})
 
   useEffect(() => {
     let alive = true;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let lastFetchAt = 0;
+
     async function pull() {
+      lastFetchAt = Date.now();
       try {
         const r = await fetch("/api/machines", { cache: "no-store" });
         if (!r.ok) throw new Error(String(r.status));
@@ -137,11 +141,50 @@ export function LiveMachineStatus({ slug, heading, subheading }: LiveProps = {})
         if (alive) setLoading(false);
       }
     }
+
+    function schedule() {
+      if (intervalId !== undefined) clearInterval(intervalId);
+      intervalId = setInterval(pull, POLL_MS);
+    }
+
+    // Wake handler for every "tab became usable again" signal a browser
+    // sends. Mobile Safari and Chrome pause / heavily throttle setInterval
+    // once the tab is backgrounded or the phone screen sleeps, so without
+    // this the grid would fall arbitrarily far behind reality by the time
+    // the owner looks at it. On wake we (a) push the countdown clock to
+    // real now, (b) trigger a fresh poll if it's been more than half an
+    // interval, and (c) restart the interval so the next scheduled poll
+    // is a full interval away.
+    function onWake() {
+      if (!alive) return;
+      setNow(Date.now());
+      if (Date.now() - lastFetchAt > POLL_MS / 2) {
+        pull();
+      }
+      schedule();
+    }
+    function onVisibility() {
+      if (document.visibilityState === "visible") onWake();
+    }
+
     pull();
-    const id = setInterval(pull, POLL_MS);
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onWake);
+    window.addEventListener("online", onWake);
+    // pageshow fires on both first paint and bfcache restore (Safari
+    // aggressively caches the whole page state when the user navigates
+    // back — without this, they'd see a stale snapshot until the next
+    // interval tick).
+    window.addEventListener("pageshow", onWake);
+
     return () => {
       alive = false;
-      clearInterval(id);
+      if (intervalId !== undefined) clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onWake);
+      window.removeEventListener("online", onWake);
+      window.removeEventListener("pageshow", onWake);
     };
   }, []);
 
