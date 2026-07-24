@@ -95,7 +95,25 @@ function liveify(m: Machine, now: number): Live {
 }
 
 // ---------- Component -------------------------------------------------------
-export function LiveMachineStatus() {
+type LiveProps = {
+  /**
+   * When set, only render the matching location's floor. Used on
+   * /locations/[slug] pages where the visitor is already scoped to one store.
+   * When omitted, render every location in the API response (homepage).
+   */
+  slug?: string;
+  /**
+   * Override the "See what's open right now." headline — useful on a
+   * per-location page where a shorter caption reads better.
+   */
+  heading?: string;
+  /**
+   * Override the sub-copy under the headline.
+   */
+  subheading?: string;
+};
+
+export function LiveMachineStatus({ slug, heading, subheading }: LiveProps = {}) {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
@@ -127,7 +145,13 @@ export function LiveMachineStatus() {
     return () => clearInterval(id);
   }, []);
 
-  const hasData = !!data && data.locations.length > 0;
+  const filteredLocations = useMemo(() => {
+    if (!data) return [];
+    if (!slug) return data.locations;
+    return data.locations.filter((e) => e.slug === slug);
+  }, [data, slug]);
+
+  const hasData = filteredLocations.length > 0;
 
   return (
     <section
@@ -156,23 +180,22 @@ export function LiveMachineStatus() {
               Live machine status
             </p>
             <h2 className="mt-3 font-display text-3xl font-extrabold tracking-tight md:text-5xl">
-              See what's open right now.
+              {heading ?? "See what's open right now."}
             </h2>
             <p className="mt-3 max-w-2xl text-sm text-paper/70 md:text-base">
-              Pulled in real time from our card-system portal. Save a wasted
-              drive — peek before you pack the basket.
+              {subheading ??
+                "Pulled in real time from our card-system portal. Save a wasted drive — peek before you pack the basket."}
             </p>
           </div>
           <FreshnessPill
             lastSyncOk={data?.lastSyncOk ?? null}
             firstSnapshotAt={
-              data?.locations[0]?.snapshot.fetchedAt ?? null
+              filteredLocations[0]?.snapshot.fetchedAt ?? null
             }
             isSimulated={
               !!(
-                data &&
-                data.locations[0] &&
-                (data.locations[0].snapshot as Snapshot & { simulated?: boolean })
+                filteredLocations[0] &&
+                (filteredLocations[0].snapshot as Snapshot & { simulated?: boolean })
                   .simulated
               )
             }
@@ -185,7 +208,7 @@ export function LiveMachineStatus() {
       {!loading && !hasData && <EmptyState />}
 
       {hasData &&
-        data!.locations.map((entry) => (
+        filteredLocations.map((entry) => (
           <LocationFloor key={entry.slug} entry={entry} now={now} />
         ))}
     </section>

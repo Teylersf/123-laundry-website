@@ -5,6 +5,10 @@ import Image from "next/image";
 import { useState } from "react";
 import { BUSINESS } from "@/lib/site-data";
 
+// Desktop nav — Home is redundant with the top-left logo, so it's omitted
+// there. The mobile menu prepends it so phone visitors have an explicit
+// "back to home" link inside the drawer (the logo above the fold might
+// scroll out of view when the menu opens).
 const NAV = [
   { label: "Locations", href: "/locations" },
   { label: "How It Works", href: "/how-it-works" },
@@ -13,6 +17,7 @@ const NAV = [
   { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
 ];
+const MOBILE_NAV = [{ label: "Home", href: "/" }, ...NAV];
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -23,7 +28,11 @@ export function SiteHeader() {
         <Link
           href="/"
           aria-label="123 Laundry — home"
-          className="-my-1.5 flex items-center gap-2 md:-my-2"
+          prefetch
+          // -my/-mx negatives + generous padding grow the tap target on
+          // mobile without visually shifting the logo — the whole logo box
+          // is a chunky "go home" button.
+          className="-my-1.5 -ml-2 flex items-center gap-2 rounded-md p-1 active:bg-brand-50 md:-my-2 md:-ml-1"
         >
           <Image
             src="/images/logo.png"
@@ -33,7 +42,7 @@ export function SiteHeader() {
             priority
             className="h-13 w-auto md:h-15"
           />
-          <span className="sr-only">{BUSINESS.name}</span>
+          <span className="sr-only">{BUSINESS.name} — home</span>
         </Link>
 
         <nav aria-label="Primary" className="hidden md:block">
@@ -109,7 +118,7 @@ export function SiteHeader() {
           className="border-t border-line bg-paper md:hidden"
         >
           <ul className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
-            {NAV.map((item) => (
+            {MOBILE_NAV.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}

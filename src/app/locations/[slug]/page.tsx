@@ -9,6 +9,7 @@ import {
   Card,
   Breadcrumbs,
 } from "@/components/ui";
+import { LiveMachineStatus } from "@/components/live-machine-status";
 import {
   BUSINESS,
   LOCATIONS,
@@ -122,8 +123,20 @@ export default async function LocationPage(
           <Button href={BUSINESS.cardBalanceUrl} external variant="ghost">
             Check card balance
           </Button>
+          <Button href="#live-status" variant="ghost">
+            Live machine status ↓
+          </Button>
         </div>
       </Section>
+
+      {/* LIVE MACHINE STATUS — scoped to this location only */}
+      <div id="live-status" className="scroll-mt-20">
+        <LiveMachineStatus
+          slug={loc.slug}
+          heading={`What's open at ${loc.city} right now.`}
+          subheading={`Live status of every washer and dryer at ${loc.name}. Updates every minute.`}
+        />
+      </div>
 
       <Section>
         <div className="grid gap-10 md:grid-cols-12">
