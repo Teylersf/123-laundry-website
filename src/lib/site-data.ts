@@ -17,7 +17,7 @@ export const BUSINESS = {
   phoneRaw: "+15099518534",
   email: "hello@123-laundry.com",
   social: {
-    facebook: "https://www.facebook.com/123LaundryDeerParkWA",
+    facebook: "https://www.facebook.com/share/1CxWP755TH/",
     instagram: "https://www.instagram.com/123laundry_",
   },
   cardBalanceUrl: "https://www.laundrycat.com/",
@@ -255,7 +255,7 @@ export const AMENITIES = [
   },
   {
     title: "Bright, modern interior",
-    body: "Honeycomb LED lighting, polished concrete, stainless commercial machines, real ventilation. It feels less like a chore and more like a clean café that happens to do laundry.",
+    body: "Honeycomb LED lighting, stainless commercial machines, real ventilation. It feels less like a chore and more like a clean café that happens to do laundry.",
   },
   {
     title: "Open every day",
@@ -288,7 +288,7 @@ export const REVIEW_SOURCES = [
   },
   {
     label: "Facebook — 123 Laundry",
-    href: "https://www.facebook.com/123LaundryDeerParkWA",
+    href: "https://www.facebook.com/share/1CxWP755TH/",
   },
 ];
 
@@ -480,7 +480,7 @@ export const SEO_LANDINGS: SeoLanding[] = [
     primaryLocation: "deer-park",
     body: [
       "Our Deer Park flagship is the original 123 Laundry — family-owned and locally operated since June 2024, in the historic Fackenthall building at 22 S Vernon Ave.",
-      "We rebuilt this 1950s tire shop into the cleanest laundromat in town. Polished surfaces, real ventilation, modern stainless machines, a complete soft water system feeding every washer, and an on-site attendant during most operating hours so you're never on your own.",
+      "We rebuilt this 1950s tire shop into the cleanest laundromat in town. Real ventilation, modern stainless machines, a complete soft water system feeding every washer, and an on-site attendant during most operating hours so you're never on your own.",
       "The card-based system is the easiest part: load any amount onto a 123 Laundry card at our touch-screen kiosk, then tap to start the washer or dryer. No quarters. Free Wi-Fi while you wait, plus a kids' literacy corner if you bring the family.",
       "Opt in at the kiosk and we'll text you when your washer is done — and again when your dryer finishes. Run errands across the street or down Main; come back to a perfectly-timed load.",
       "Open seven days a week, 6 AM to 9 PM. Last load at 8 PM, doors close at 9 PM. Across the street from the Deer Park Post Office.",

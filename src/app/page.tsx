@@ -236,8 +236,8 @@ export default function HomePage() {
               We rebuilt a 1950s tire shop in downtown Deer Park into the
               cleanest laundromat in town — and we ran the same playbook for
               our second store on Pines Road in Spokane Valley. Stainless
-              commercial Huebsch machines, polished concrete, real ventilation,
-              honeycomb LED lighting, on-site attendants.
+              commercial Huebsch machines, real ventilation, honeycomb LED
+              lighting, on-site attendants.
             </p>
             <p className="mt-4 text-ink/75">
               Built for the way people actually use a laundromat: quick,
