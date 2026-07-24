@@ -14,7 +14,12 @@ export const LAUNDRYCAT_BASE = "https://www.laundrycat.com";
 export const MACHINES_API_PATH = "/machines";
 
 export type MachineKind = "washer" | "dryer" | "other";
-export type MachineStatus = "available" | "busy" | "offline" | "unknown";
+export type MachineStatus =
+  | "available"
+  | "busy"
+  | "done"      // cycle finished, waiting for pickup
+  | "offline"
+  | "unknown";
 
 export type Machine = {
   /** As shown by LaundryCat, e.g. "W26", "D11", "DOOR50". */
@@ -141,6 +146,18 @@ function classifyStatus(rawLabel: string, isOnline: boolean): MachineStatus {
   const l = rawLabel.trim().toLowerCase();
   if (l === "available") return "available";
   if (l === "busy" || l === "in use" || l === "running") return "busy";
+  // Cycle finished, waiting for the customer to open the door and remove
+  // their load. LaundryCat reports this as "Cycle Done" on Speed Queen
+  // gear, but we accept the common variants too.
+  if (
+    l === "cycle done" ||
+    l === "cycle complete" ||
+    l === "complete" ||
+    l === "done" ||
+    l === "finished" ||
+    l === "ready"
+  )
+    return "done";
   if (l === "offline" || l === "out of order") return "offline";
   return "unknown";
 }

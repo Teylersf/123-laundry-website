@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 type Machine = {
   id: string;
   kind: "washer" | "dryer" | "other";
-  status: "available" | "busy" | "offline" | "unknown";
+  status: "available" | "busy" | "done" | "offline" | "unknown";
   rawLabel: string;
   remainingSeconds: number | null;
   endsAt: string | null;
@@ -85,10 +85,15 @@ function liveify(m: Machine, now: number): Live {
       0,
       Math.round((new Date(m.endsAt).getTime() - now) / 1000),
     );
+    // When the client-side countdown hits zero the cycle is over but
+    // nobody has picked up the load yet — optimistically flip to "done"
+    // (waiting for pickup) rather than "available", since the machine
+    // isn't actually free until someone opens the door. The next server
+    // poll will confirm the real state.
     return {
       ...m,
       liveSeconds: sec,
-      liveStatus: sec === 0 ? "available" : "busy",
+      liveStatus: sec === 0 ? "done" : "busy",
     };
   }
   return { ...m, liveSeconds: m.remainingSeconds, liveStatus: m.status };
@@ -449,7 +454,12 @@ function DrumRow({
 //   offline   → desaturated, no motion, small ⨯ mark
 // Keyframes live in globals.css and are gated on prefers-reduced-motion.
 
-type MachineStatusVisual = "available" | "busy" | "offline" | "unknown";
+type MachineStatusVisual =
+  | "available"
+  | "busy"
+  | "done"
+  | "offline"
+  | "unknown";
 
 function statusPalette(status: MachineStatusVisual) {
   switch (status) {
@@ -469,6 +479,18 @@ function statusPalette(status: MachineStatusVisual) {
         text: "text-amber-200",
         badge: "bg-amber-400",
       };
+    case "done":
+      // Blue = "cycle finished, waiting for customer to pick up". Distinct
+      // enough from busy (amber) and available (emerald) that a scan of the
+      // grid tells a customer at a glance which drums have clothes still in
+      // them vs which are truly open.
+      return {
+        body: "fill-[#101418] stroke-sky-400/50",
+        door: "stroke-sky-300/70",
+        drum: "fill-sky-500/10 stroke-sky-400/60",
+        text: "text-sky-200",
+        badge: "bg-sky-400",
+      };
     case "offline":
       return {
         body: "fill-[#101418] stroke-zinc-600/40",
@@ -478,11 +500,14 @@ function statusPalette(status: MachineStatusVisual) {
         badge: "bg-zinc-500",
       };
     default:
+      // "unknown" — LaundryCat reported a status we don't recognize. Render
+      // a completely neutral drum with no state color, no text overlay, no
+      // slash. Better a mystery machine than a jarring "UNKNOWN" label.
       return {
-        body: "fill-[#101418] stroke-zinc-600/40",
-        door: "stroke-zinc-500/50",
-        drum: "fill-zinc-700/15 stroke-zinc-600/40",
-        text: "text-zinc-500",
+        body: "fill-[#101418] stroke-zinc-700/40",
+        door: "stroke-zinc-600/40",
+        drum: "fill-zinc-800/15 stroke-zinc-700/40",
+        text: "text-zinc-400",
         badge: "bg-zinc-500",
       };
   }
@@ -704,6 +729,10 @@ function Drum({ m }: { m: Live }) {
   const p = statusPalette(status);
   const showCountdown =
     status === "busy" && m.liveSeconds !== null && m.liveSeconds > 0;
+  // "Cycle finished, waiting for pickup" — surface it as an explicit label
+  // over the drum so customers can tell at a glance which machines have
+  // clothes still sitting in them.
+  const showDoneBadge = status === "done";
 
   // Deterministic seed per machine ID so animations offset consistently
   // across renders (no lockstep row of dryers, no random flicker on rehydrate).
@@ -713,10 +742,15 @@ function Drum({ m }: { m: Live }) {
 
   const Icon = m.kind === "dryer" ? DryerIcon : WasherIcon;
 
+  // Hover tooltip: for the rare "unknown" status don't leak that word to the
+  // public — just show the machine ID.
+  const hoverLabel =
+    status === "unknown" ? m.id : `${m.id} — ${m.rawLabel}`;
+
   return (
     <div
       className="group relative flex flex-col items-center"
-      title={`${m.id} — ${m.rawLabel}`}
+      title={hoverLabel}
     >
       <div className="relative aspect-square w-full transition-transform duration-200 group-hover:-translate-y-0.5">
         <Icon status={status as MachineStatusVisual} seed={seed} />
@@ -728,6 +762,18 @@ function Drum({ m }: { m: Live }) {
               className={`rounded-md bg-ink/85 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums shadow-md md:text-xs ${p.text}`}
             >
               {fmtCountdown(m.liveSeconds!)}
+            </span>
+          </div>
+        )}
+
+        {/* "Done" badge for cycle-finished machines. Same overlay style as
+            the busy countdown so the two states read as siblings. */}
+        {showDoneBadge && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span
+              className={`rounded-md bg-ink/85 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shadow-md md:text-xs ${p.text}`}
+            >
+              Done
             </span>
           </div>
         )}
