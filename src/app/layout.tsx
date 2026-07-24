@@ -5,6 +5,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LocalBusinessJsonLd } from "@/components/local-business-jsonld";
+import { ChromeGate } from "@/components/chrome-gate";
 import { BUSINESS, SITE_URL } from "@/lib/site-data";
 
 const sourceSans = Source_Sans_3({
@@ -105,12 +106,16 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <SiteHeader />
+        <ChromeGate>
+          <SiteHeader />
+        </ChromeGate>
         <main id="main" className="flex-1">
           {children}
         </main>
-        <SiteFooter />
-        <LocalBusinessJsonLd />
+        <ChromeGate>
+          <SiteFooter />
+          <LocalBusinessJsonLd />
+        </ChromeGate>
         <Analytics />
       </body>
     </html>
