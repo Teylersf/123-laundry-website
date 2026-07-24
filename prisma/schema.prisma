@@ -26,3 +26,95 @@ model KvEntry {
   @@index([expiresAt])
   @@map("kv_entries")
 }
+
+// Time-series archive of every raw /machines response the relay ships.
+// Never pruned — this is the source of truth for future field extraction and
+// re-analysis when we notice a field we didn't structure at capture time.
+model RawSnapshot {
+  id         BigInt   @id @default(autoincrement())
+  capturedAt DateTime @default(now())
+  payload    Json
+
+  locations              LocationObservation[]
+  machines               MachineObservation[]
+
+  @@index([capturedAt])
+  @@map("raw_snapshots")
+}
+
+// One row per location per poll — the aggregate counters LaundryCat returns.
+model LocationObservation {
+  id                 BigInt   @id @default(autoincrement())
+  capturedAt         DateTime @default(now())
+  snapshotId         BigInt
+  locationId         String
+  locationSlug       String?
+  locationLabel      String
+  washersAvailable   Int
+  washersTotal       Int
+  dryersAvailable    Int
+  dryersTotal        Int
+  otherCount         Int
+  websocketSupport   Boolean?
+
+  snapshot           RawSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([capturedAt])
+  @@index([locationSlug, capturedAt])
+  @@index([snapshotId])
+  @@map("location_observations")
+}
+
+// One row per machine per poll. This is the meat of the time-series — every
+// state transition and every countdown tick is captured here. `payload` keeps
+// the entire raw machine object so future analysis can pick up fields we
+// haven't structured yet without touching the raw_snapshots archive.
+model MachineObservation {
+  id                          BigInt    @id @default(autoincrement())
+  capturedAt                  DateTime  @default(now())
+  snapshotId                  BigInt
+  locationId                  String
+  locationSlug                String?
+  machineNumber               String    // "W26", "D11", "DOOR50", "SOAP48"
+  kind                        String    // washer / dryer / other
+  status                      String    // available / busy / offline / unknown
+  rawLabel                    String
+  rawStatusCode               Int?      // LaundryCat's numeric Status enum
+  rawColour                   String?
+  isOnline                    Boolean
+  showTimer                   Boolean?
+  remainingSeconds            Int?
+  endsAt                      DateTime?
+
+  // Fields harvested directly from LaundryCat's raw machine object. These
+  // power the analytics UI (error rates, cycle durations from
+  // statusTimestamp deltas, firmware rollouts, reader RSSI trend).
+  machineDbId                 BigInt?   // LaundryCat's internal machine PK (10-digit)
+  dateAdded                   DateTime? // when the machine was provisioned
+  errorCode1                  Int?
+  errorCode2                  Int?
+  errorCode3                  Int?
+  machineSpecificStatusCode1  Int?      // Speed Queen / vendor-specific code
+  machineSpecificStatusCode2  Int?
+  firmwareFilename            String?
+  isFirmwareUpdatePending     Boolean?
+  lastUpdateSettings          DateTime?
+  locationKey                 String?
+  priceCategoryId             Int?
+  readerTechVersionId         Int?
+  rfidStatus                  Int?
+  rssi                        Int?      // reader WiFi signal strength
+  seqNo                       Int?
+  statusTimestamp             DateTime? // when the current status started
+
+  payload                     Json      // full raw machine object
+
+  snapshot                    RawSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([capturedAt])
+  @@index([locationSlug, machineNumber, capturedAt])
+  @@index([snapshotId])
+  @@index([errorCode1, capturedAt])
+  @@index([statusTimestamp])
+  @@map("machine_observations")
+}
