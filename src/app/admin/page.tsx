@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdminSessionOrRedirect } from "@/lib/admin-auth";
 import { LOCATION_LIST } from "@/lib/site-data";
@@ -11,6 +13,79 @@ export const metadata: Metadata = {
 // The admin surface is data-driven — never precompute.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+// ---------- Time-range picker ----------------------------------------------
+// The owner asked for analytics across many time windows (day, week, month,
+// quarter, year, all-time, custom). We drive everything off ?range= or an
+// explicit ?from=&to=. Data is never pruned, so "all" scans the full history.
+type RangeKey = "1d" | "7d" | "30d" | "90d" | "1y" | "all" | "custom";
+const RANGES: { key: Exclude<RangeKey, "custom">; label: string; days: number | null }[] = [
+  { key: "1d", label: "24h", days: 1 },
+  { key: "7d", label: "7d", days: 7 },
+  { key: "30d", label: "30d", days: 30 },
+  { key: "90d", label: "90d", days: 90 },
+  { key: "1y", label: "1y", days: 365 },
+  { key: "all", label: "All time", days: null },
+];
+
+type ActiveRange = {
+  key: RangeKey;
+  label: string;
+  from: Date | null; // null = beginning of time
+  to: Date | null;   // null = now
+  customFromIso?: string;
+  customToIso?: string;
+};
+
+function parseIsoDate(v: string | undefined): Date | null {
+  if (!v) return null;
+  // Accept plain YYYY-MM-DD (treated as UTC midnight) or full ISO.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00Z`) : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseRange(sp: {
+  range?: string;
+  from?: string;
+  to?: string;
+}): ActiveRange {
+  const from = parseIsoDate(sp.from);
+  const to = parseIsoDate(sp.to);
+  if (from && to && to > from) {
+    return {
+      key: "custom",
+      label: `${sp.from} → ${sp.to}`,
+      from,
+      to,
+      customFromIso: sp.from,
+      customToIso: sp.to,
+    };
+  }
+  const picked =
+    RANGES.find((r) => r.key === sp.range) ??
+    RANGES.find((r) => r.key === "30d")!;
+  if (picked.days === null) {
+    return { key: picked.key, label: picked.label, from: null, to: null };
+  }
+  return {
+    key: picked.key,
+    label: picked.label,
+    from: new Date(Date.now() - picked.days * 24 * 60 * 60 * 1000),
+    to: null,
+  };
+}
+
+// SQL fragment for the WHERE clause. Empty when "all time" so Postgres does
+// not add a bogus lower bound.
+function rangeFilter(range: ActiveRange) {
+  if (range.from && range.to) {
+    return Prisma.sql`AND "capturedAt" >= ${range.from} AND "capturedAt" < ${range.to}`;
+  }
+  if (range.from) {
+    return Prisma.sql`AND "capturedAt" >= ${range.from}`;
+  }
+  return Prisma.empty;
+}
 
 type MachineRow = {
   locationSlug: string | null;
@@ -64,7 +139,8 @@ type UsageRow = {
   worst_rssi: number | null;
 };
 
-async function loadDashboard() {
+async function loadDashboard(range: ActiveRange) {
+  const rf = rangeFilter(range);
   // Latest observation per machine (per location) — DISTINCT ON keeps this to
   // one row per machine even with 60s-cadence writes.
   const latestMachines = await db.$queryRaw<MachineRow[]>`
@@ -119,7 +195,7 @@ async function loadDashboard() {
     ORDER BY 1
   `;
 
-  // Per-machine usage aggregate for the last 30 days. Everything the two
+  // Per-machine usage aggregate over the picked window. Everything the two
   // analytics cards below need in a single scan.
   const usage = await db.$queryRaw<UsageRow[]>`
     SELECT
@@ -140,12 +216,14 @@ async function loadDashboard() {
       COUNT(*)::bigint AS total_polls,
       MIN("rssi") AS worst_rssi
     FROM machine_observations
-    WHERE "capturedAt" > NOW() - INTERVAL '30 days'
-      AND kind IN ('washer', 'dryer')
+    WHERE kind IN ('washer', 'dryer')
+      ${rf}
     GROUP BY "locationSlug", "machineNumber", kind
   `;
 
-  // Error events in the last 7 days — non-zero on any of the three codes.
+  // Error events inside the picked window — non-zero on any of the three
+  // codes. Top 50 most recent, so this doubles as an "all time" view when
+  // the range is set to All.
   const errors = await db.$queryRaw<ErrorRow[]>`
     SELECT
       "capturedAt",
@@ -156,9 +234,10 @@ async function loadDashboard() {
       "errorCode3",
       "rawLabel"
     FROM machine_observations
-    WHERE ("errorCode1" IS NOT NULL AND "errorCode1" <> 0)
-       OR ("errorCode2" IS NOT NULL AND "errorCode2" <> 0)
-       OR ("errorCode3" IS NOT NULL AND "errorCode3" <> 0)
+    WHERE (("errorCode1" IS NOT NULL AND "errorCode1" <> 0)
+       OR  ("errorCode2" IS NOT NULL AND "errorCode2" <> 0)
+       OR  ("errorCode3" IS NOT NULL AND "errorCode3" <> 0))
+      ${rf}
     ORDER BY "capturedAt" DESC
     LIMIT 50
   `;
@@ -297,10 +376,16 @@ function Card({
   );
 }
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard(
+  props: {
+    searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+  },
+) {
   await requireAdminSessionOrRedirect();
+  const sp = await props.searchParams;
+  const range = parseRange(sp);
 
-  const { latestMachines, pipeline, util, errors, usage } = await loadDashboard();
+  const { latestMachines, pipeline, util, errors, usage } = await loadDashboard(range);
   const now = Date.now();
 
   const usageMetrics = toUsageMetrics(usage);
@@ -363,10 +448,13 @@ export default async function AdminDashboard() {
           Dashboard
         </h1>
         <p className="mt-2 text-sm text-white/60">
-          Every LaundryCat data point, captured every 60 seconds. Charts fill
-          in as more history accumulates.
+          Every LaundryCat data point, captured every 60 seconds. Nothing is
+          ever pruned — history grows forever.
         </p>
       </div>
+
+      <RangePicker active={range} />
+
 
       {/* PIPELINE STATUS */}
       <Card
@@ -471,8 +559,8 @@ export default async function AdminDashboard() {
 
       {/* ERROR TRACKER */}
       <Card
-        title="Errors"
-        subtitle="Any machine that reported a non-zero error code."
+        title={`Errors — ${range.label}`}
+        subtitle="Any machine that reported a non-zero error code inside the selected window. Most recent first, top 50."
       >
         {errors.length === 0 ? (
           <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">
@@ -521,7 +609,7 @@ export default async function AdminDashboard() {
 
       {/* USAGE RANKING */}
       <Card
-        title="Machine usage — last 30 days"
+        title={`Machine usage — ${range.label}`}
         subtitle="Which machines are pulling weight, which are barely touched. Cycles are load starts; run time is total minutes turning."
       >
         {usageMetrics.length === 0 ? (
@@ -553,7 +641,7 @@ export default async function AdminDashboard() {
 
       {/* REPAIR-RISK WATCHLIST */}
       <Card
-        title="Repair-risk watchlist — last 30 days"
+        title={`Repair-risk watchlist — ${range.label}`}
         subtitle="Composite of cycles (wear), error events, and offline time. Higher score = more attention worth giving."
       >
         {watchlist.length === 0 ? (
@@ -665,6 +753,82 @@ export default async function AdminDashboard() {
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+// Mobile-first range chips + collapsible custom date form. Each chip is a
+// plain link that swaps ?range=; no JS needed. Custom form is a GET so it
+// also works without JS and shows up in the address bar (bookmarkable).
+function RangePicker({ active }: { active: ActiveRange }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-ink-soft p-3 md:p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-white/60">
+          Time range
+        </p>
+        <p className="text-[11px] text-white/40">
+          {active.key === "custom" ? "Custom" : `Showing: ${active.label}`}
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {RANGES.map((r) => {
+          const isActive = active.key === r.key;
+          return (
+            <Link
+              key={r.key}
+              href={`/admin?range=${r.key}`}
+              prefetch={false}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                isActive
+                  ? "border-brand-200 bg-brand-200/20 text-brand-100"
+                  : "border-white/15 text-white/70 hover:border-white/30 hover:text-white"
+              }`}
+            >
+              {r.label}
+            </Link>
+          );
+        })}
+      </div>
+      <details className="mt-3 group" open={active.key === "custom"}>
+        <summary className="cursor-pointer list-none text-[11px] font-semibold uppercase tracking-wider text-white/50 hover:text-white/80">
+          Custom date range
+          <span className="ml-1 text-white/30 group-open:hidden">▾</span>
+          <span className="ml-1 text-white/30 hidden group-open:inline">▴</span>
+        </summary>
+        <form
+          action="/admin"
+          method="get"
+          className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]"
+        >
+          <label className="flex flex-col gap-1 text-[11px] text-white/60">
+            From
+            <input
+              type="date"
+              name="from"
+              defaultValue={active.customFromIso ?? ""}
+              className="rounded-lg border border-white/15 bg-ink px-2 py-1.5 text-sm text-white scheme-dark"
+              required
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-white/60">
+            To
+            <input
+              type="date"
+              name="to"
+              defaultValue={active.customToIso ?? ""}
+              className="rounded-lg border border-white/15 bg-ink px-2 py-1.5 text-sm text-white scheme-dark"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="self-end rounded-lg bg-brand-200 px-3 py-2 text-xs font-bold text-ink hover:bg-brand-100"
+          >
+            Apply
+          </button>
+        </form>
+      </details>
     </div>
   );
 }
