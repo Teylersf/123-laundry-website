@@ -157,9 +157,9 @@ h6 {
   50%      { opacity: 1;    transform: scale(1.08); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .machine-anim,
-  .machine-anim * {
-    animation: none !important;
-  }
-}
+/* Note: we deliberately do NOT gate these on prefers-reduced-motion.
+   iOS "Reduce Motion" (Settings > Accessibility > Motion) is on by default
+   for a lot of users, and it silently killed the whole washer/dryer grid
+   for anyone who had it toggled. These animations are functional — a
+   spinning drum is how a customer distinguishes a busy machine from an
+   available one at a glance — so they need to run even under reduce-motion. */

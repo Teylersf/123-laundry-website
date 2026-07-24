@@ -578,18 +578,13 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
       <circle cx="74" cy="17" r="1.6" className="fill-white/20" />
       {/* Porthole outer */}
       <circle cx="50" cy="58" r="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
-      {/* Drum window — spinning + water. transform-box: fill-box +
-          transform-origin: center are set INLINE so iOS Safari rotates
-          the drum around its own center rather than around the SVG
-          viewport's (0,0) corner. */}
-      <g
-        style={{
-          transformBox: "fill-box",
-          transformOrigin: "center",
-          willChange: "transform",
-          animation: busy ? `machine-spin 6s linear infinite ${spinDelay}s` : undefined,
-        }}
-      >
+      {/* Drum window — spins via SVG-native SMIL. iOS Safari has been
+          flaky with CSS animations on SVG child elements (fill-box +
+          transform-origin sometimes ignored, sometimes suppressed by
+          Reduce Motion), so we use <animateTransform> here instead —
+          it's part of the SVG spec, works everywhere, and rotates
+          reliably around the specified pivot (50, 58). */}
+      <g>
         <circle cx="50" cy="58" r="22" className={`${p.drum}`} strokeWidth={1.5} />
         {/* Drum divot pattern so the spin is visible */}
         {[0, 60, 120, 180, 240, 300].map((deg) => (
@@ -601,6 +596,18 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
             className="fill-white/15"
           />
         ))}
+        {busy && (
+          <animateTransform
+            attributeName="transform"
+            attributeType="XML"
+            type="rotate"
+            from={`0 50 58`}
+            to={`360 50 58`}
+            dur="6s"
+            begin={`${spinDelay}s`}
+            repeatCount="indefinite"
+          />
+        )}
       </g>
       {/* Water — clip to porthole so it only shows inside the drum */}
       <defs>
@@ -706,16 +713,9 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
       <circle cx="79" cy="20" r="1.6" className={busy ? "fill-amber-400" : "fill-white/25"} />
       {/* Door — slightly larger porthole with rounded rectangle bezel */}
       <rect x="20" y="34" width="60" height="54" rx="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
-      {/* Tumbling drum — see the washer's spinning drum comment above for
-          why transform-box + transform-origin are inline. */}
-      <g
-        style={{
-          transformBox: "fill-box",
-          transformOrigin: "center",
-          willChange: "transform",
-          animation: busy ? `machine-tumble 7s linear infinite ${tumbleDelay}s` : undefined,
-        }}
-      >
+      {/* Tumbling drum — uses SMIL animateTransform for the same reason
+          as the washer's spinning drum: bulletproof on iOS Safari. */}
+      <g>
         <circle cx="50" cy="61" r="22" className={`${p.drum}`} strokeWidth={1.5} />
         {/* Baffles */}
         {[0, 120, 240].map((deg) => {
@@ -754,6 +754,18 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
               />
             );
           })}
+        {busy && (
+          <animateTransform
+            attributeName="transform"
+            attributeType="XML"
+            type="rotate"
+            from={`0 50 61`}
+            to={`-360 50 61`}
+            dur="7s"
+            begin={`${tumbleDelay}s`}
+            repeatCount="indefinite"
+          />
+        )}
       </g>
       {/* Available breathing halo */}
       {status === "available" && (
