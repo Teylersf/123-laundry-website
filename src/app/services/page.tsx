@@ -38,7 +38,7 @@ const SERVICES = [
   },
   {
     title: "Card management & balance check",
-    body: "Reload your card at our kiosks or online. Check your balance anytime through our LaundryCat partner portal.",
+    body: "Reload your card in store at the kiosk. Check your balance anytime online through our LaundryCat partner portal.",
     href: "/check-balance",
   },
   {

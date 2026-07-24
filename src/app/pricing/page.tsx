@@ -12,7 +12,7 @@ import { BUSINESS, LOCATION_LIST, PAYMENT_METHODS } from "@/lib/site-data";
 export const metadata: Metadata = {
   title: "Pricing — How Payment Works at 123 Laundry",
   description:
-    "Pricing posted on every machine. Card-based, load any amount, no quarters. Reload your card online via LaundryCat or in person at the kiosk.",
+    "Pricing posted on every machine. Card-based, load any amount, no quarters. Reloads happen in store at the kiosk — check your balance anytime online via LaundryCat.",
   alternates: { canonical: "/pricing" },
 };
 

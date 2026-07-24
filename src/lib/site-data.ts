@@ -468,7 +468,7 @@ export const SEO_LANDINGS: SeoLanding[] = [
       "If you're looking for a laundromat in Spokane Valley, our Pines Road location is built for people who actually want a pleasant laundry experience. Bright LED lighting, stainless commercial Huebsch washers and dryers, on-site attendants during most operating hours, and free Wi-Fi.",
       "Every machine in the building runs through a complete soft water system — that means less detergent, softer fabrics, and brighter colors out of the wash. We have extra-large washers that handle comforters, sleeping bags, and king-size duvets in a single load.",
       "Opt in at the kiosk and we'll text you when your washer finishes — and again when your dryer is done. Drop the load, grab a coffee, run an errand. We'll let you know when it's time to come back.",
-      "Payment is simple: load any amount onto a 123 Laundry card at our touch-screen kiosk, then tap to start. No quarters, no scrambling for change. Reload your card anytime online or in person.",
+      "Payment is simple: load any amount onto a 123 Laundry card at our touch-screen kiosk, then tap to start. No quarters, no scrambling for change. Reloads are in-store at the kiosk anytime we're open.",
       "Open seven days a week, 7 AM to 9 PM. Last load goes in at 8 PM. We're at 110 S Pines Rd, easy on/off from I-90 and Sprague.",
     ],
   },
@@ -577,7 +577,7 @@ export const SEO_LANDINGS: SeoLanding[] = [
     body: [
       "We've never asked a customer for a quarter, and we never will. 123 Laundry runs entirely on a card system: walk in, load any amount onto a 123 Laundry card at our touch-screen kiosk, then tap the card on a washer or dryer to start it.",
       "No fishing for change. No broken coin slots. No hauling around a roll of quarters. The kiosk is roughly as easy to use as an ATM, and our attendants will walk you through it the first time.",
-      "Manage and reload your card anytime through our partner LaundryCat — or just come in and top up at the kiosk.",
+      "Reload your card in store at the kiosk anytime we're open. You can check your balance online anytime through our partner LaundryCat.",
     ],
   },
 ];
@@ -645,11 +645,11 @@ export const FAQ = [
   },
   {
     q: "How do I reload my card?",
-    a: "You can reload at our touch-screen kiosks in either store, or online through our card partner LaundryCat (linked from our website).",
+    a: "Reload at our touch-screen kiosks inside either store. Reloads are in-store only — we don't accept online reloads. You can still check your balance online through our card partner LaundryCat (linked from our website).",
   },
   {
     q: "Who owns 123 Laundry?",
-    a: "Jake and Katie Duenich — family-owned and local.",
+    a: "Family-owned and local.",
   },
   {
     q: "How can I get in touch?",
