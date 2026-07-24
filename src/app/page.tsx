@@ -210,7 +210,7 @@ export default function HomePage() {
             href={BUSINESS.cardBalanceUrl}
             external
             variant="secondary"
-            className="bg-paper text-brand hover:bg-brand-100"
+            className="bg-paper! text-brand! hover:bg-brand-100!"
           >
             Check your card balance
           </Button>

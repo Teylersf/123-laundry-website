@@ -44,12 +44,6 @@ export default function PrivacyPage() {
               our partner LaundryCat.
             </li>
             <li>
-              <strong>Payment information.</strong> When you load funds onto
-              your card, payment details are processed by LaundryCat and
-              their payment processor. We do not store your card number on
-              our website.
-            </li>
-            <li>
               <strong>Usage data on this website.</strong> Standard server
               logs (IP address, browser, page URL) used for security, error
               tracking, and traffic analysis.

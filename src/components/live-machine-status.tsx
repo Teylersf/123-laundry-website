@@ -578,10 +578,15 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
       <circle cx="74" cy="17" r="1.6" className="fill-white/20" />
       {/* Porthole outer */}
       <circle cx="50" cy="58" r="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
-      {/* Drum window — spinning + water. Origin comes from the .machine-anim
-          fill-box rule in globals.css so it works on iOS Safari. */}
+      {/* Drum window — spinning + water. transform-box: fill-box +
+          transform-origin: center are set INLINE so iOS Safari rotates
+          the drum around its own center rather than around the SVG
+          viewport's (0,0) corner. */}
       <g
         style={{
+          transformBox: "fill-box",
+          transformOrigin: "center",
+          willChange: "transform",
           animation: busy ? `machine-spin 6s linear infinite ${spinDelay}s` : undefined,
         }}
       >
@@ -612,6 +617,8 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
             height="26"
             className="fill-brand-400/45"
             style={{
+              transformBox: "fill-box",
+              transformOrigin: "center",
               animation: `machine-water 3.4s ease-in-out infinite ${(-seed % 3)}s`,
             }}
           />
@@ -624,6 +631,8 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
               r={1.4 + (i % 2) * 0.6}
               className="fill-white/70"
               style={{
+                transformBox: "fill-box",
+                transformOrigin: "center",
                 animation: `machine-bubble ${2.4 + i * 0.6}s ease-in infinite ${-((seed + i) % 4)}s`,
               }}
             />
@@ -641,6 +650,8 @@ function WasherIcon({ status, seed }: { status: MachineStatusVisual; seed: numbe
           className="fill-none stroke-emerald-300/70"
           strokeWidth={0.8}
           style={{
+            transformBox: "fill-box",
+            transformOrigin: "center",
             animation: `machine-breathe 3.4s ease-in-out infinite ${-(seed % 3)}s`,
           }}
         />
@@ -678,6 +689,8 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
               ry={3.5 + i * 0.6}
               className="fill-white/25"
               style={{
+                transformBox: "fill-box",
+                transformOrigin: "center",
                 animation: `machine-steam ${3 + i * 0.7}s ease-out infinite ${-((seed + i) % 4)}s`,
               }}
             />
@@ -693,9 +706,13 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
       <circle cx="79" cy="20" r="1.6" className={busy ? "fill-amber-400" : "fill-white/25"} />
       {/* Door — slightly larger porthole with rounded rectangle bezel */}
       <rect x="20" y="34" width="60" height="54" rx="26" className={`${p.door} fill-black/70`} strokeWidth={2.5} />
-      {/* Tumbling drum */}
+      {/* Tumbling drum — see the washer's spinning drum comment above for
+          why transform-box + transform-origin are inline. */}
       <g
         style={{
+          transformBox: "fill-box",
+          transformOrigin: "center",
+          willChange: "transform",
           animation: busy ? `machine-tumble 7s linear infinite ${tumbleDelay}s` : undefined,
         }}
       >
@@ -749,6 +766,8 @@ function DryerIcon({ status, seed }: { status: MachineStatusVisual; seed: number
           className="fill-none stroke-emerald-300/70"
           strokeWidth={0.8}
           style={{
+            transformBox: "fill-box",
+            transformOrigin: "center",
             animation: `machine-breathe 3.4s ease-in-out infinite ${-(seed % 3)}s`,
           }}
         />

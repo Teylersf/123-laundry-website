@@ -23,13 +23,8 @@ const SERVICES = [
   },
   {
     title: "Extra-large capacity washers",
-    body: "Comforters, sleeping bags, king-sized duvets, big family loads — our Spokane Valley location features extra-large commercial washers built for one-load wins.",
+    body: "Comforters, sleeping bags, king-sized duvets, big family loads — both locations feature extra-large commercial washers built for one-load wins.",
     href: "/large-capacity-washer-spokane-valley",
-  },
-  {
-    title: "Soft-water laundry (Spokane Valley)",
-    body: "Every machine in our Spokane Valley location runs on 100% soft water — softer fabrics, brighter colors, less detergent waste.",
-    href: "/soft-water-laundromat-spokane-valley",
   },
   {
     title: "Family-friendly setup",

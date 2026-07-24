@@ -96,17 +96,13 @@ h6 {
 /*  Live machine status — washer / dryer animations                            */
 /* -------------------------------------------------------------------------- */
 
-/* Every animated child of a machine icon needs `transform-box: fill-box`
-   with `transform-origin: center` — otherwise iOS Safari applies rotations
-   and scales around the SVG viewport's (0,0) point instead of the element's
-   own center, which throws the drum, water, bubbles, halo, and steam wildly
-   off-screen and makes it look like "the animations don't work on mobile".
-   Applying this to every animated child of `.machine-anim` catches the whole
-   set in one rule and stays robust as we add new machine parts. */
-.machine-anim [style*="animation"] {
-  transform-box: fill-box;
-  transform-origin: center;
-}
+/* iOS Safari applies transforms to SVG children around the SVG viewport's
+   (0,0) point unless `transform-box: fill-box` is set — that's why the
+   drums, halos, and steam wisps looked frozen on mobile. The fix is
+   applied INLINE next to each `animation` property in the component
+   (not via an attribute selector here) because inline styles are the
+   only way to guarantee both properties are on the element regardless
+   of how React serializes the style object or which CSS rules match. */
 
 /* Washer drum: continuous spin. Slower than a real spin cycle so it reads
    across the grid without turning into a strobe. Using pixel translates
