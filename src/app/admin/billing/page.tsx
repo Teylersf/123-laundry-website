@@ -157,7 +157,7 @@ export default async function BillingPage(props: {
               </button>
             </form>
           ) : (
-            <form action="/admin/billing/checkout" method="post">
+            <form action="/admin/billing/start-subscription" method="post">
               <button
                 type="submit"
                 className="rounded-full bg-brand px-5 py-3 font-semibold text-white hover:bg-brand-600"
