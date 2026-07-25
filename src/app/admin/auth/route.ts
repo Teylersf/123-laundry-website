@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   const form = await req.formData();
   const submitted = String(form.get("password") ?? "");
-  if (!verifyPassword(submitted)) {
+  if (!(await verifyPassword(submitted))) {
     return NextResponse.redirect(new URL("/admin/login?err=1", req.url), {
       status: 303,
     });

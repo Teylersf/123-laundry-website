@@ -14,6 +14,8 @@ export const KV_KEYS = {
   lastSyncError: "lc:lastError",
   lastSyncAt: "lc:lastSyncAt", // last sync attempt (success or failure)
   lastSyncOk: "lc:lastSyncOk", // last *successful* sync — drives the UI's stale indicator
+  adminPassword: "admin:password",
+  billingAccount: "billing:account",
 } as const;
 
 export type StoredSession = {

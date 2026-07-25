@@ -11,6 +11,7 @@
  * Edge middleware where the surface is more limited.
  */
 import crypto from "node:crypto";
+import { kv, KV_KEYS } from "./kv";
 
 export const ADMIN_COOKIE = "laundry_admin";
 // 30 days — the owner uses mobile and shouldn't have to re-auth constantly.
@@ -30,17 +31,49 @@ function requireSecret(): string {
  * Constant-time comparison for the master password. `crypto.timingSafeEqual`
  * throws if the buffers differ in length — pad both to a common width.
  */
-export function verifyPassword(submitted: string): boolean {
-  const expected = process.env.ADMIN_PASSWORD ?? "";
-  if (!expected) return false;
-  const a = Buffer.from(submitted, "utf8");
-  const b = Buffer.from(expected, "utf8");
+function constantTimeEqual(aText: string, bText: string): boolean {
+  const a = Buffer.from(aText, "utf8");
+  const b = Buffer.from(bText, "utf8");
   const width = Math.max(a.length, b.length, 1);
   const ap = Buffer.alloc(width);
   const bp = Buffer.alloc(width);
   a.copy(ap);
   b.copy(bp);
   return crypto.timingSafeEqual(ap, bp) && a.length === b.length;
+}
+
+type StoredPassword = {
+  algorithm: "scrypt";
+  salt: string;
+  hash: string;
+  updatedAt: string;
+};
+
+function derivePassword(password: string, salt: string): string {
+  return crypto.scryptSync(password, salt, 64).toString("hex");
+}
+
+export async function verifyPassword(submitted: string): Promise<boolean> {
+  const stored = await kv.get<StoredPassword>(KV_KEYS.adminPassword);
+  if (stored?.algorithm === "scrypt" && stored.salt && stored.hash) {
+    return constantTimeEqual(
+      derivePassword(submitted, stored.salt),
+      stored.hash,
+    );
+  }
+
+  const expected = process.env.ADMIN_PASSWORD ?? "";
+  return Boolean(expected) && constantTimeEqual(submitted, expected);
+}
+
+export async function updatePassword(password: string): Promise<void> {
+  const salt = crypto.randomBytes(24).toString("hex");
+  await kv.set(KV_KEYS.adminPassword, {
+    algorithm: "scrypt",
+    salt,
+    hash: derivePassword(password, salt),
+    updatedAt: new Date().toISOString(),
+  } satisfies StoredPassword);
 }
 
 function base64url(input: Buffer | string): string {

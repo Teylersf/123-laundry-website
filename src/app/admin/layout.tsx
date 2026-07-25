@@ -38,14 +38,28 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <span className="text-brand-200">admin</span>
             </Link>
           </div>
-          <form action="/admin/logout" method="post">
-            <button
-              type="submit"
+          <div className="flex items-center gap-2">
+            <Link
+              href="/admin/billing"
+              className="rounded-full border border-brand-200/40 px-3 py-1.5 text-xs font-semibold text-brand-100 hover:border-brand-200 hover:text-white"
+            >
+              Billing
+            </Link>
+            <Link
+              href="/admin/password"
               className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 hover:border-brand-200 hover:text-brand-100"
             >
-              Sign out
-            </button>
-          </form>
+              Password
+            </Link>
+            <form action="/admin/logout" method="post">
+              <button
+                type="submit"
+                className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 hover:border-brand-200 hover:text-brand-100"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
       <div className="mx-auto max-w-5xl px-4 py-6 md:py-10">{children}</div>
