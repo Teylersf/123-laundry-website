@@ -205,7 +205,7 @@ export const HEADLINE_FEATURES: Feature[] = [
   },
   {
     title: "Live machine status",
-    blurb: "Check which washers and dryers are open right now from the kiosk or your phone.",
+    blurb: "Check which washers and dryers are open right now from this website.",
     icon: "live-status",
   },
 ];
