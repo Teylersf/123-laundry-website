@@ -5,6 +5,7 @@ import { requireAdminSessionOrRedirect } from "@/lib/admin-auth";
 import { LOCATION_LIST } from "@/lib/site-data";
 import { parseRange, type ActiveRange } from "./_range";
 import { RangePicker } from "./_range-picker";
+import { kv, KV_KEYS } from "@/lib/kv";
 
 export const metadata: Metadata = {
   title: "Admin dashboard — 123 Laundry",
@@ -326,6 +327,10 @@ export default async function AdminDashboard(
   const range = parseRange(sp);
 
   const { latestMachines, pipeline, util, errors, usage } = await loadDashboard(range);
+  const homepageMachineDisplay =
+    (await kv.get<"summary" | "detailed" | "off">(
+      KV_KEYS.homepageMachineDisplay,
+    )) ?? "summary";
   const now = Date.now();
 
   const usageMetrics = toUsageMetrics(usage);
@@ -401,6 +406,57 @@ export default async function AdminDashboard(
         label="Live · right now"
         hint="Current state as of the last poll. Not affected by the time-range picker below."
       />
+
+      <Card
+        title="Homepage machine display"
+        subtitle="This only changes what customers see on the homepage. Collection, history, and this admin dashboard always keep running."
+      >
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-white">
+              Currently showing:{" "}
+              <span className="text-brand-200">
+                {homepageMachineDisplay === "detailed"
+                  ? "Detailed live machines"
+                  : homepageMachineDisplay === "summary"
+                    ? "Friendly activity summary"
+                    : "Hidden completely"}
+              </span>
+            </p>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-white/55">
+              The friendly summary groups live usage into four positive
+              activity levels without publishing machine counts or timers.
+              Detailed mode restores the original homepage floor exactly.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { mode: "summary", label: "Friendly summary" },
+              { mode: "detailed", label: "Detailed machines" },
+              { mode: "off", label: "Hide section" },
+            ].map((option) => (
+              <form
+                key={option.mode}
+                action="/admin/homepage-status"
+                method="post"
+              >
+                <input type="hidden" name="mode" value={option.mode} />
+                <button
+                  type="submit"
+                  disabled={homepageMachineDisplay === option.mode}
+                  className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
+                    homepageMachineDisplay === option.mode
+                      ? "cursor-default bg-brand text-white"
+                      : "border border-white/15 bg-white/5 text-white/75 hover:border-brand-200 hover:text-brand-200"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              </form>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       {/* PIPELINE STATUS */}
       <Card

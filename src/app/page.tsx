@@ -11,6 +11,7 @@ import {
 import { Icon } from "@/components/feature-icon";
 import { LiveMachineStatus } from "@/components/live-machine-status";
 import { HomepageBusynessStatus } from "@/components/homepage-busyness-status";
+import { kv, KV_KEYS } from "@/lib/kv";
 import {
   BUSINESS,
   FAQ,
@@ -20,12 +21,17 @@ import {
 } from "@/lib/site-data";
 import Link from "next/link";
 
-// Keep the detailed machine floor intact for when Jake wants it back.
-// Changing this to true restores the original homepage presentation without
-// touching the relay, API, database, admin dashboard, or location pages.
-const SHOW_DETAILED_HOMEPAGE_MACHINE_STATUS = false;
+// This page reads Jake's admin-controlled display preference on every request.
+// Neither mode changes the relay, snapshots, analytics, or location pages.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function HomePage() {
+export default async function HomePage() {
+  const homepageMachineDisplay =
+    (await kv.get<"summary" | "detailed" | "off">(
+      KV_KEYS.homepageMachineDisplay,
+    )) ?? "summary";
+
   return (
     <>
       {/* HERO */}
@@ -74,11 +80,11 @@ export default function HomePage() {
       </section>
 
       {/* The detailed live floor remains preserved behind a reversible switch. */}
-      {SHOW_DETAILED_HOMEPAGE_MACHINE_STATUS ? (
+      {homepageMachineDisplay === "detailed" ? (
         <LiveMachineStatus />
-      ) : (
+      ) : homepageMachineDisplay === "summary" ? (
         <HomepageBusynessStatus />
-      )}
+      ) : null}
 
       {/* OWNER-PRIORITY FEATURE STRIP — must stay above the fold-ish */}
       <section
