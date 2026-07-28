@@ -12,7 +12,7 @@ import { BUSINESS } from "@/lib/site-data";
 export const metadata: Metadata = {
   title: "Check Card Balance — 123 Laundry on LaundryCat",
   description:
-    "Check your 123 Laundry card balance and view recent transactions through our LaundryCat partner portal — anytime, from any device. Card reloads are in store only.",
+    "Check your 123 Laundry card balance through our LaundryCat partner portal. Card reloads are available in store only.",
   alternates: { canonical: "/check-balance" },
 };
 
@@ -24,10 +24,9 @@ export default function CheckBalancePage() {
         <SectionEyebrow>Card balance</SectionEyebrow>
         <SectionHeading level={1}>Check your 123 Laundry card balance.</SectionHeading>
         <p className="mt-6 max-w-3xl text-lg text-ink/75">
-          We use LaundryCat to manage card accounts. Open the LaundryCat
-          portal, sign in with the email you used at the kiosk, and you'll see
-          your current balance plus recent transactions. Card reloads are in
-          store only — top up at the kiosk in either location.
+          Open the LaundryCat portal and sign in with the number on the back of
+          your laundry card to see your current balance. Card reloads are
+          available in store only.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button href={BUSINESS.cardBalanceUrl} external>
@@ -50,18 +49,16 @@ export default function CheckBalancePage() {
             <div className="font-display text-3xl font-black text-brand">2</div>
             <h2 className="mt-2 font-display text-lg font-bold">Sign in</h2>
             <p className="mt-2 text-sm text-ink/75">
-              Use the email you set up at the kiosk in either store. If you
-              don't remember which email you used, our attendants can help
-              look it up.
+              Use the number on the back of your 123 Laundry card. If you need
+              help finding it, ask one of our attendants.
             </p>
           </Card>
           <Card>
             <div className="font-display text-3xl font-black text-brand">3</div>
             <h2 className="mt-2 font-display text-lg font-bold">Check your balance</h2>
             <p className="mt-2 text-sm text-ink/75">
-              See your current balance and recent washes. To reload, stop by
-              either store and use the touch-screen kiosk — online reloads
-              aren't available.
+              See your current balance. Card reloads are available in store
+              only; online reloads aren't available.
             </p>
           </Card>
         </div>
