@@ -10,6 +10,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/feature-icon";
 import { LiveMachineStatus } from "@/components/live-machine-status";
+import { HomepageBusynessStatus } from "@/components/homepage-busyness-status";
 import {
   BUSINESS,
   FAQ,
@@ -18,6 +19,11 @@ import {
   REVIEW_SOURCES,
 } from "@/lib/site-data";
 import Link from "next/link";
+
+// Keep the detailed machine floor intact for when Jake wants it back.
+// Changing this to true restores the original homepage presentation without
+// touching the relay, API, database, admin dashboard, or location pages.
+const SHOW_DETAILED_HOMEPAGE_MACHINE_STATUS = false;
 
 export default function HomePage() {
   return (
@@ -67,8 +73,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* LIVE MACHINE STATUS — pulled from LaundryCat every 5 minutes */}
-      <LiveMachineStatus />
+      {/* The detailed live floor remains preserved behind a reversible switch. */}
+      {SHOW_DETAILED_HOMEPAGE_MACHINE_STATUS ? (
+        <LiveMachineStatus />
+      ) : (
+        <HomepageBusynessStatus />
+      )}
 
       {/* OWNER-PRIORITY FEATURE STRIP — must stay above the fold-ish */}
       <section
