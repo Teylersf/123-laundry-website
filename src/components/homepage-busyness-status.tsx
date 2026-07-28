@@ -141,8 +141,11 @@ export function HomepageBusynessStatus() {
             </p>
           </div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-paper/15 bg-paper/5 px-4 py-2 text-xs text-paper/75 backdrop-blur">
-            <span className="size-1.5 rounded-full bg-emerald-400" />
-            Updated throughout the day
+            <span className="relative inline-flex size-2.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400/65" />
+              <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
+            </span>
+            Updating live
           </div>
         </div>
 
