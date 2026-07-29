@@ -36,7 +36,7 @@ const LOCATION_DISPLAY: Record<string, { city: string; address: string }> = {
 
 const LEVELS: BusynessLevel[] = [
   {
-    label: "Slightly busy",
+    label: "Not Busy",
     availability: "Machines available",
     note: "A relaxed time to stop in.",
     accent: "text-cyan-200",
