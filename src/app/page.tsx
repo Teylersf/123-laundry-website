@@ -49,7 +49,15 @@ export default async function HomePage() {
         </div>
         <div className="relative mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-28">
           <Pill size="large">
-            Locally owned · Deer Park &amp; Spokane Valley
+            <span className="flex flex-col items-start">
+              <span className="text-xs font-bold uppercase tracking-[0.14em]">
+                Locally owned
+              </span>
+              <span className="mt-1 font-display text-xl font-black leading-tight tracking-tight md:text-2xl">
+                <span className="block md:inline">Deer Park &amp;</span>{" "}
+                <span className="block md:inline">Spokane Valley</span>
+              </span>
+            </span>
           </Pill>
           <h1 className="mt-5 max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
             The cleanest laundromat
