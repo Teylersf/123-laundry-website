@@ -16,6 +16,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const VERCEL_ANALYTICS_URL =
+  "https://vercel.com/teylerks-projects/123-laundry/analytics";
+
 // SQL fragment for the WHERE clause. Empty when "all time" so Postgres does
 // not add a bogus lower bound.
 function rangeFilter(range: ActiveRange) {
@@ -397,6 +400,41 @@ export default async function AdminDashboard(
           ever pruned — history grows forever.
         </p>
       </div>
+
+      <Card
+        title="Website traffic — Vercel Analytics"
+        subtitle="The complete visitor dashboard for 123-laundry.com, hosted securely by Vercel."
+      >
+        <div className="rounded-2xl border border-brand-200/20 bg-linear-to-br from-brand/15 via-brand/5 to-transparent p-4 md:p-5">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-brand-200/25 bg-brand/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-100">
+                <span className="size-2 rounded-full bg-emerald-300" />
+                Official Vercel dashboard
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-white/75">
+                See visitors, page views, bounce rate, top pages, referrers,
+                countries, devices, browsers, and operating systems. Change the
+                reporting window, filter to production traffic, and export
+                panel data as CSV.
+              </p>
+            </div>
+            <a
+              href={VERCEL_ANALYTICS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            >
+              Open website analytics ↗
+            </a>
+          </div>
+          <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-relaxed text-white/50">
+            Vercel sign-in is required. Use the email address that was invited
+            as a read-only Viewer; Viewer access cannot change the website or
+            its settings.
+          </p>
+        </div>
+      </Card>
 
       {/* ============================ LIVE ============================
           Current state of the stores. Numbers here reflect the most
