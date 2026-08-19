@@ -109,9 +109,22 @@ export function Card({
   );
 }
 
-export function Pill({ children }: { children: ReactNode }) {
+export function Pill({
+  children,
+  size = "default",
+}: {
+  children: ReactNode;
+  size?: "default" | "large";
+}) {
+  const sizeClasses =
+    size === "large"
+      ? "px-4 py-2 text-sm md:px-5 md:py-2.5 md:text-base"
+      : "px-3 py-1 text-xs";
+
   return (
-    <span className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+    <span
+      className={`inline-flex items-center rounded-full border border-brand-200 bg-brand-50 font-semibold text-brand-700 ${sizeClasses}`}
+    >
       {children}
     </span>
   );
