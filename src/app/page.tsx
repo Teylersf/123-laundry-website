@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   Stat,
-  Pill,
 } from "@/components/ui";
 import { Icon } from "@/components/feature-icon";
 import { LiveMachineStatus } from "@/components/live-machine-status";
@@ -48,17 +47,14 @@ export default async function HomePage() {
           <div className="absolute inset-0 bg-linear-to-b from-ink/75 via-ink/70 to-ink/90" />
         </div>
         <div className="relative mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-28">
-          <Pill size="large">
-            <span className="flex flex-col items-start">
-              <span className="text-xs font-bold uppercase tracking-[0.14em]">
-                Locally owned
-              </span>
-              <span className="mt-1 font-display text-xl font-black leading-tight tracking-tight md:text-2xl">
-                <span className="block md:inline">Deer Park &amp;</span>{" "}
-                <span className="block md:inline">Spokane Valley</span>
-              </span>
+          <div className="inline-flex max-w-full flex-col items-start rounded-2xl border border-brand-200 bg-brand-50/95 px-4 py-3 text-brand-800 shadow-xl shadow-black/20 backdrop-blur-sm md:rounded-3xl md:px-5 md:py-3.5">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] md:text-xs">
+              Locally owned · Two locations
             </span>
-          </Pill>
+            <span className="mt-0.5 whitespace-nowrap font-display text-[clamp(1rem,5vw,1.125rem)] font-extrabold tracking-tight md:text-2xl">
+              Deer Park <span className="text-brand-500">&amp;</span> Spokane Valley
+            </span>
+          </div>
           <h1 className="mt-5 max-w-3xl font-display text-4xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
             The cleanest laundromat
             <span className="block text-brand-200">in town.</span>
