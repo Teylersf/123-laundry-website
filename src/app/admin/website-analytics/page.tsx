@@ -9,6 +9,7 @@ import {
 } from "@/lib/website-analytics";
 import { parseRange } from "../_range";
 import { RangePicker } from "../_range-picker";
+import { AnalyticsRefresh } from "./_analytics-refresh";
 
 export const metadata: Metadata = {
   title: "Website analytics — 123 Laundry Admin",
@@ -233,6 +234,7 @@ export default async function WebsiteAnalyticsPage({
       </div>
 
       <RangePicker active={range} basePath="/admin/website-analytics" />
+      <AnalyticsRefresh />
 
       {!report ? (
         <SetupState />
@@ -263,12 +265,12 @@ export default async function WebsiteAnalyticsPage({
             <MetricCard
               label="Engagement"
               value={percentage(report.summary.engagementRate)}
-              note="Sessions with 2+ pages"
+              note="10s active or 2+ pages"
             />
             <MetricCard
               label="Avg. session"
               value={duration(report.summary.averageSessionDuration)}
-              note="Time per visit"
+              note="Active time per visit"
             />
           </div>
 

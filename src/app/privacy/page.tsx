@@ -48,7 +48,7 @@ export default function PrivacyPage() {
               <strong>Usage data on this website.</strong> Standard server
               logs (IP address, browser, page URL) used for security, error
               tracking, and traffic analysis. Our private first-party analytics
-              records page views, randomly generated visitor and session IDs,
+              records page views, active time on a page, randomly generated visitor and session IDs,
               referral source, approximate country, and device/browser
               categories. It does not store IP addresses, names, card numbers,
               phone numbers, raw user-agent strings, or kiosk information.

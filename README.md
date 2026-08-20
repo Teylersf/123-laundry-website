@@ -52,7 +52,9 @@ same signed admin session as the machine dashboard. Public page views are sent
 to `/api/analytics`; `/admin` traffic and known bots are excluded. The collector
 stores random visitor/session IDs and aggregate request metadata, but never raw
 IP addresses, raw user-agent strings, names, emails, phone numbers, or LaundryCat
-identifiers. No third-party analytics account or reporting credential is needed.
+identifiers. Active time is sent in cumulative ten-second heartbeats so
+single-page visits can contribute to session duration and engagement. No
+third-party analytics account or reporting credential is needed.
 
 ## Admin dashboard loading
 

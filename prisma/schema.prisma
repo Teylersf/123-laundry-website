@@ -141,6 +141,7 @@ model WebAnalyticsEvent {
   browser         String
   operatingSystem String
   screenWidth     Int?
+  engagedSeconds  Int      @default(0)
 
   @@index([occurredAt])
   @@index([path, occurredAt])

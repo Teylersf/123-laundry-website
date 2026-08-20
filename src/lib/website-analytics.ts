@@ -117,7 +117,7 @@ export async function loadWebsiteAnalytics(
   const firstFilter = firstVisitRangeFilter(range);
 
   const [summaryRows, dailyRows, pageRows, sourceRows, countryRows, deviceRows, browserRows] =
-    await Promise.all([
+    await db.$transaction([
       db.$queryRaw<SummaryRow[]>`
         WITH ranged AS (
           SELECT *
@@ -128,7 +128,7 @@ export async function loadWebsiteAnalytics(
           SELECT
             "sessionId",
             COUNT(*)::bigint AS page_views,
-            EXTRACT(EPOCH FROM (MAX("occurredAt") - MIN("occurredAt")))::float AS duration_seconds
+            SUM("engagedSeconds")::bigint AS engaged_seconds
           FROM ranged
           GROUP BY "sessionId"
         ),
@@ -149,9 +149,9 @@ export async function loadWebsiteAnalytics(
           (SELECT COUNT(DISTINCT "sessionId")::bigint FROM ranged) AS sessions,
           (SELECT COUNT(*)::bigint FROM ranged) AS page_views,
           COALESCE((SELECT AVG(
-            CASE WHEN page_views >= 2 THEN 1.0 ELSE 0.0 END
+            CASE WHEN page_views >= 2 OR engaged_seconds >= 10 THEN 1.0 ELSE 0.0 END
           )::float FROM session_stats), 0)::float AS engagement_rate,
-          COALESCE((SELECT AVG(duration_seconds)::float FROM session_stats), 0)::float
+          COALESCE((SELECT AVG(engaged_seconds)::float FROM session_stats), 0)::float
             AS average_session_duration,
           (SELECT COUNT(DISTINCT "visitorId")::bigint
              FROM web_analytics_events

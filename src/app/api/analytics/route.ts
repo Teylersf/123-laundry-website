@@ -7,9 +7,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type PageViewPayload = {
+  kind?: unknown;
   eventId?: unknown;
   visitorId?: unknown;
   sessionId?: unknown;
+  engagedSeconds?: unknown;
   isLanding?: unknown;
   path?: unknown;
   title?: unknown;
@@ -92,6 +94,38 @@ export async function POST(request: Request) {
     !validId(payload.visitorId) ||
     !validId(payload.sessionId)
   ) {
+    return noContent();
+  }
+
+  if (payload.kind === "engagement") {
+    const engagedSeconds = Number(payload.engagedSeconds);
+    if (
+      !Number.isInteger(engagedSeconds) ||
+      engagedSeconds < 1 ||
+      engagedSeconds > 7_200
+    ) {
+      return noContent();
+    }
+
+    try {
+      await db.$executeRaw`
+        UPDATE web_analytics_events
+        SET "engagedSeconds" = GREATEST("engagedSeconds", ${engagedSeconds})
+        WHERE "eventId" = ${payload.eventId}
+          AND "visitorId" = ${payload.visitorId}
+          AND "sessionId" = ${payload.sessionId}
+          AND "occurredAt" >= NOW() - INTERVAL '2 hours'
+      `;
+    } catch (error) {
+      console.error(
+        "[first-party-analytics] engagement write failed",
+        error instanceof Prisma.PrismaClientKnownRequestError
+          ? error.code
+          : error instanceof Error
+            ? error.name
+            : "unknown",
+      );
+    }
     return noContent();
   }
 
