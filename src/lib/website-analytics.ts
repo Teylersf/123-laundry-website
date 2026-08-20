@@ -102,9 +102,7 @@ function ranked(rows: RankedRow[]): AnalyticsRankedRow[] {
 
 function countryName(code: string): string {
   try {
-    return (
-      new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code
-    );
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code;
   } catch {
     return code;
   }
@@ -116,9 +114,16 @@ export async function loadWebsiteAnalytics(
   const rangeFilter = eventRangeFilter(range);
   const firstFilter = firstVisitRangeFilter(range);
 
-  const [summaryRows, dailyRows, pageRows, sourceRows, countryRows, deviceRows, browserRows] =
-    await db.$transaction([
-      db.$queryRaw<SummaryRow[]>`
+  const [
+    summaryRows,
+    dailyRows,
+    pageRows,
+    sourceRows,
+    countryRows,
+    deviceRows,
+    browserRows,
+  ] = await db.$transaction([
+    db.$queryRaw<SummaryRow[]>`
         WITH ranged AS (
           SELECT *
           FROM web_analytics_events e
@@ -159,7 +164,7 @@ export async function loadWebsiteAnalytics(
           NOW() AS generated_at,
           (SELECT MIN("occurredAt") FROM web_analytics_events) AS collection_started_at
       `,
-      db.$queryRaw<DailyRow[]>`
+    db.$queryRaw<DailyRow[]>`
         SELECT
           DATE_TRUNC('day', e."occurredAt" AT TIME ZONE 'America/Los_Angeles') AS day,
           COUNT(DISTINCT e."visitorId")::bigint AS active_users,
@@ -170,7 +175,7 @@ export async function loadWebsiteAnalytics(
         GROUP BY 1
         ORDER BY 1
       `,
-      db.$queryRaw<RankedRow[]>`
+    db.$queryRaw<RankedRow[]>`
         SELECT
           e.path AS label,
           MAX(e.title) AS detail,
@@ -182,13 +187,37 @@ export async function loadWebsiteAnalytics(
         ORDER BY primary_value DESC, e.path
         LIMIT 12
       `,
-      db.$queryRaw<RankedRow[]>`
+    db.$queryRaw<RankedRow[]>`
         SELECT
-          COALESCE(NULLIF(e."utmSource", ''), NULLIF(e."referrerHost", ''), 'Direct') AS label,
-          COALESCE(
-            NULLIF(e."utmMedium", ''),
-            CASE WHEN e."referrerHost" IS NOT NULL THEN 'referral' ELSE NULL END
-          ) AS detail,
+          CASE
+            WHEN e."adSource" = 'google_ads' THEN 'Google Ads'
+            WHEN LOWER(COALESCE(e."utmSource", '')) = 'p3d'
+              AND LOWER(COALESCE(e."utmMedium", '')) = 'display'
+              THEN 'StackAdapt Display'
+            ELSE COALESCE(
+              NULLIF(e."utmSource", ''),
+              NULLIF(e."referrerHost", ''),
+              'Direct'
+            )
+          END AS label,
+          CASE
+            WHEN e."adSource" = 'google_ads' THEN CONCAT_WS(
+              ' · ',
+              'Paid ad',
+              NULLIF(e."utmCampaign", '')
+            )
+            WHEN LOWER(COALESCE(e."utmSource", '')) = 'p3d'
+              AND LOWER(COALESCE(e."utmMedium", '')) = 'display'
+              THEN CONCAT_WS(
+                ' · ',
+                'Original source: P3D',
+                NULLIF(e."utmCampaign", '')
+              )
+            ELSE COALESCE(
+              NULLIF(e."utmMedium", ''),
+              CASE WHEN e."referrerHost" IS NOT NULL THEN 'referral' ELSE NULL END
+            )
+          END AS detail,
           COUNT(DISTINCT e."sessionId")::bigint AS primary_value,
           COUNT(DISTINCT e."visitorId")::bigint AS secondary_value
         FROM web_analytics_events e
@@ -197,7 +226,7 @@ export async function loadWebsiteAnalytics(
         ORDER BY primary_value DESC, label
         LIMIT 12
       `,
-      db.$queryRaw<RankedRow[]>`
+    db.$queryRaw<RankedRow[]>`
         SELECT
           COALESCE(e.country, 'Unknown') AS label,
           NULL::text AS detail,
@@ -209,7 +238,7 @@ export async function loadWebsiteAnalytics(
         ORDER BY primary_value DESC, label
         LIMIT 10
       `,
-      db.$queryRaw<RankedRow[]>`
+    db.$queryRaw<RankedRow[]>`
         SELECT
           INITCAP(e."deviceCategory") AS label,
           NULL::text AS detail,
@@ -221,7 +250,7 @@ export async function loadWebsiteAnalytics(
         ORDER BY primary_value DESC, label
         LIMIT 10
       `,
-      db.$queryRaw<RankedRow[]>`
+    db.$queryRaw<RankedRow[]>`
         SELECT
           e.browser AS label,
           e."operatingSystem" AS detail,
@@ -233,7 +262,7 @@ export async function loadWebsiteAnalytics(
         ORDER BY primary_value DESC, label
         LIMIT 10
       `,
-    ]);
+  ]);
 
   const summary = summaryRows[0] ?? {
     active_users: BigInt(0),

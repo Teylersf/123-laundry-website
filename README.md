@@ -18,19 +18,19 @@ Open-source source code for **[123 Laundry](https://123-laundry.com/)**, a famil
 
 Both stores run the same modern, card-based setup:
 
-| Feature | Deer Park | Spokane Valley |
-| --- | :---: | :---: |
-| Card-based payment, no quarters | ✓ | ✓ |
-| Free customer Wi-Fi | ✓ | ✓ |
-| On-site customer bathrooms | ✓ | ✓ |
-| Kids' literacy corner | ✓ | ✓ |
-| On-site vending (detergent, drinks) | ✓ | ✓ |
-| Small, standard, and extra-large washers | ✓ | ✓ |
-| Complete soft water system | ✓ | ✓ |
-| Text alerts when your laundry is done | ✓ | ✓ |
-| Live machine-status from your phone | ✓ | ✓ |
-| On-site attendant during most operating hours | ✓ | ✓ |
-| Open every day of the year | ✓ | ✓ |
+| Feature                                       | Deer Park | Spokane Valley |
+| --------------------------------------------- | :-------: | :------------: |
+| Card-based payment, no quarters               |     ✓     |       ✓        |
+| Free customer Wi-Fi                           |     ✓     |       ✓        |
+| On-site customer bathrooms                    |     ✓     |       ✓        |
+| Kids' literacy corner                         |     ✓     |       ✓        |
+| On-site vending (detergent, drinks)           |     ✓     |       ✓        |
+| Small, standard, and extra-large washers      |     ✓     |       ✓        |
+| Complete soft water system                    |     ✓     |       ✓        |
+| Text alerts when your laundry is done         |     ✓     |       ✓        |
+| Live machine-status from your phone           |     ✓     |       ✓        |
+| On-site attendant during most operating hours |     ✓     |       ✓        |
+| Open every day of the year                    |     ✓     |       ✓        |
 
 ## Tech stack
 
@@ -55,6 +55,10 @@ IP addresses, raw user-agent strings, names, emails, phone numbers, or LaundryCa
 identifiers. Active time is sent in cumulative ten-second heartbeats so
 single-page visits can contribute to session duration and engagement. No
 third-party analytics account or reporting credential is needed.
+Google Ads visits are recognized from the presence and type of Google click
+parameters (`gclid`, `gbraid`, or `wbraid`) without storing the identifier
+itself. Known legacy `P3D` display tags are presented as StackAdapt Display,
+while their original source value remains visible in the report.
 
 ## Admin dashboard loading
 

@@ -19,6 +19,8 @@ type PageViewPayload = {
   utmSource?: unknown;
   utmMedium?: unknown;
   utmCampaign?: unknown;
+  adSource?: unknown;
+  adClickType?: unknown;
   screenWidth?: unknown;
 };
 
@@ -36,9 +38,7 @@ function validId(value: unknown): value is string {
 }
 
 function requestIsFromPublicSite(request: Request): boolean {
-  const host = (request.headers.get("host") ?? "")
-    .toLowerCase()
-    .split(":")[0];
+  const host = (request.headers.get("host") ?? "").toLowerCase().split(":")[0];
   const isLocal =
     process.env.NODE_ENV !== "production" &&
     (host === "localhost" || host === "127.0.0.1");
@@ -59,7 +59,9 @@ function requestIsFromPublicSite(request: Request): boolean {
 function externalReferrer(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
-    const hostname = new URL(value).hostname.toLowerCase().replace(/^www\./, "");
+    const hostname = new URL(value).hostname
+      .toLowerCase()
+      .replace(/^www\./, "");
     return hostname === "123-laundry.com" ? null : hostname.slice(0, 160);
   } catch {
     return null;
@@ -156,6 +158,13 @@ export async function POST(request: Request) {
         utmSource: cleanText(payload.utmSource, 120),
         utmMedium: cleanText(payload.utmMedium, 120),
         utmCampaign: cleanText(payload.utmCampaign, 160),
+        adSource: payload.adSource === "google_ads" ? "google_ads" : null,
+        adClickType:
+          payload.adClickType === "gclid" ||
+          payload.adClickType === "gbraid" ||
+          payload.adClickType === "wbraid"
+            ? payload.adClickType
+            : null,
         country,
         deviceCategory: parsed.device.type ?? "desktop",
         browser: parsed.browser.name ?? "Unknown",

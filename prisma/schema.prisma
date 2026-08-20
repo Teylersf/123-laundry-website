@@ -136,6 +136,8 @@ model WebAnalyticsEvent {
   utmSource       String?
   utmMedium       String?
   utmCampaign     String?
+  adSource        String?
+  adClickType     String?
   country         String?
   deviceCategory  String
   browser         String

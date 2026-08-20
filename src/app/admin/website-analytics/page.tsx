@@ -40,24 +40,49 @@ function duration(seconds: number): string {
   return `${minutes}m ${remainingSeconds}s`;
 }
 
+function InfoTip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex normal-case tracking-normal">
+      <button
+        type="button"
+        aria-label="More information"
+        className="flex size-5 items-center justify-center rounded-full border border-white/20 text-[11px] font-bold text-white/60 hover:border-brand-200 hover:text-brand-100 focus-visible:border-brand-200 focus-visible:text-brand-100"
+      >
+        i
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none invisible fixed inset-x-4 top-1/2 z-30 w-auto -translate-y-1/2 rounded-lg border border-white/15 bg-black px-3 py-2 text-left text-xs font-normal leading-relaxed text-white opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 sm:absolute sm:inset-x-auto sm:left-1/2 sm:top-full sm:mt-2 sm:w-64 sm:-translate-x-1/2 sm:translate-y-0"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 function MetricCard({
   label,
   value,
   note,
   live = false,
+  help,
 }: {
   label: string;
   value: string;
   note: string;
   live?: boolean;
+  help: string;
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-ink-soft p-4">
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-white/55">
         {live && <span className="size-2 rounded-full bg-emerald-300" />}
         {label}
+        <InfoTip text={help} />
       </div>
-      <p className="mt-2 font-display text-3xl font-black text-white">{value}</p>
+      <p className="mt-2 font-display text-3xl font-black text-white">
+        {value}
+      </p>
       <p className="mt-1 text-xs text-white/45">{note}</p>
     </div>
   );
@@ -67,17 +92,22 @@ function ReportCard({
   title,
   subtitle,
   children,
+  help,
 }: {
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  help?: string;
 }) {
   return (
     <section className="rounded-2xl border border-white/10 bg-ink-soft p-4 md:p-5">
       <header className="mb-4">
-        <h2 className="font-display text-base font-bold text-white md:text-lg">
-          {title}
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-display text-base font-bold text-white md:text-lg">
+            {title}
+          </h2>
+          {help && <InfoTip text={help} />}
+        </div>
         <p className="text-xs text-white/50 md:text-sm">{subtitle}</p>
       </header>
       {children}
@@ -246,31 +276,37 @@ export default async function WebsiteAnalyticsPage({
               value={wholeNumber(report.realtimeUsers)}
               note="Last 30 minutes"
               live
+              help="Estimated unique visitors who generated activity during the last 30 minutes. It is not a count of people currently looking at the same page this exact second."
             />
             <MetricCard
               label="Visitors"
               value={wholeNumber(report.summary.activeUsers)}
               note={`${wholeNumber(report.summary.newUsers)} new`}
+              help="Unique browsers seen during the selected date range. A person using multiple browsers or devices can be counted more than once."
             />
             <MetricCard
               label="Sessions"
               value={wholeNumber(report.summary.sessions)}
               note="Total visits"
+              help="A session is one visit. It ends after 30 minutes without activity, so one visitor can have several sessions."
             />
             <MetricCard
               label="Page views"
               value={wholeNumber(report.summary.pageViews)}
               note="Pages viewed"
+              help="The total number of public website pages loaded, including multiple pages viewed during the same visit. Admin pages and known bots are excluded."
             />
             <MetricCard
               label="Engagement"
               value={percentage(report.summary.engagementRate)}
               note="10s active or 2+ pages"
+              help="The percentage of sessions with at least 10 seconds of active viewing or two or more page views. Very recent visits can update after their next activity heartbeat."
             />
             <MetricCard
               label="Avg. session"
               value={duration(report.summary.averageSessionDuration)}
               note="Active time per visit"
+              help="Average active viewing time per session. Time in a hidden browser tab is excluded, and recent sessions update in roughly 10-second increments."
             />
           </div>
 
@@ -295,6 +331,7 @@ export default async function WebsiteAnalyticsPage({
             <ReportCard
               title="Traffic sources"
               subtitle="How visitors found the website."
+              help="Google Ads is detected from Google click tags. StackAdapt campaigns previously tagged as P3D are shown as StackAdapt Display while preserving P3D underneath. Direct means no campaign tag and no external referrer were available; some older untagged ad visits may remain Direct."
             >
               <RankedList
                 rows={report.sources}

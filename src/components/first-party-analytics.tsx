@@ -136,7 +136,8 @@ function flushEngagement() {
     7_200,
     Math.floor(activePage.engagedMs / 1000),
   );
-  if (engagedSeconds < 1 || engagedSeconds <= activePage.lastSentSeconds) return;
+  if (engagedSeconds < 1 || engagedSeconds <= activePage.lastSentSeconds)
+    return;
 
   activePage.lastSentSeconds = engagedSeconds;
   touchSession(activePage.sessionId);
@@ -162,6 +163,9 @@ function trackPageView(pathname: string) {
   const session = currentSession(now);
   const isLandingView = !session.landingSent;
   const query = new URLSearchParams(window.location.search);
+  const googleClickType = isLandingView
+    ? (["gclid", "gbraid", "wbraid"] as const).find((key) => query.has(key))
+    : undefined;
   const eventId = randomId();
   const visitor = visitorId();
   const payload = {
@@ -176,6 +180,8 @@ function trackPageView(pathname: string) {
     utmSource: isLandingView ? query.get("utm_source") : "",
     utmMedium: isLandingView ? query.get("utm_medium") : "",
     utmCampaign: isLandingView ? query.get("utm_campaign") : "",
+    adSource: googleClickType ? "google_ads" : "",
+    adClickType: googleClickType ?? "",
     screenWidth: window.screen.width,
   };
 
