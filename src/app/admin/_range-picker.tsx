@@ -16,9 +16,11 @@ import { RANGES, type ActiveRange } from "./_range";
 export function RangePicker({
   active,
   basePath = "/admin",
+  persistentParams,
 }: {
   active: ActiveRange;
   basePath?: string;
+  persistentParams?: Record<string, string>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -26,6 +28,11 @@ export function RangePicker({
   // shows a spinner rather than the whole row.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const visiblePendingKey = pending ? pendingKey : null;
+
+  function href(params: Record<string, string>) {
+    const query = new URLSearchParams({ ...persistentParams, ...params });
+    return `${basePath}?${query.toString()}`;
+  }
 
   function pick(key: string, href: string) {
     if (pending) return;
@@ -45,7 +52,7 @@ export function RangePicker({
     setPendingKey("custom");
     startTransition(() => {
       router.push(
-        `${basePath}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        href({ from, to }),
       );
     });
   }
@@ -72,7 +79,7 @@ export function RangePicker({
             <button
               key={r.key}
               type="button"
-              onClick={() => pick(r.key, `${basePath}?range=${r.key}`)}
+              onClick={() => pick(r.key, href({ range: r.key }))}
               disabled={pending}
               aria-pressed={isActive}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${

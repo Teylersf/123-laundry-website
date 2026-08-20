@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
+import { Suspense } from "react";
 import { db } from "@/lib/db";
 import { requireAdminSessionOrRedirect } from "@/lib/admin-auth";
+import { cachedDashboardQuery } from "@/lib/admin-dashboard-cache";
 import { LOCATION_LIST } from "@/lib/site-data";
 import { parseRange, type ActiveRange } from "./_range";
 import { RangePicker } from "./_range-picker";
+import {
+  HistoricalViewPicker,
+  type HistoricalView,
+} from "./_historical-view-picker";
 import { kv, KV_KEYS } from "@/lib/kv";
 
 export const metadata: Metadata = {
@@ -46,6 +52,7 @@ type MachineRow = {
   isFirmwareUpdatePending: boolean | null;
   firmwareFilename: string | null;
   dateAdded: Date | null;
+  currentTime: Date;
 };
 
 type UtilBucket = {
@@ -81,53 +88,87 @@ type UsageRow = {
   worst_rssi: number | null;
 };
 
-async function loadDashboard(range: ActiveRange) {
-  const rf = rangeFilter(range);
-  // Latest observation per machine (per location) — DISTINCT ON keeps this to
-  // one row per machine even with 60s-cadence writes.
-  const latestMachines = await db.$queryRaw<MachineRow[]>`
-    SELECT DISTINCT ON ("locationSlug", "machineNumber")
-      "locationSlug",
-      "machineNumber",
-      kind,
-      status,
-      "rawLabel",
-      "remainingSeconds",
-      "endsAt",
-      "statusTimestamp",
-      "isOnline",
-      rssi,
-      "errorCode1",
-      "errorCode2",
-      "errorCode3",
-      "isFirmwareUpdatePending",
-      "firmwareFilename",
-      "dateAdded"
-    FROM machine_observations
-    ORDER BY "locationSlug", "machineNumber", "capturedAt" DESC
-  `;
+type PipelineRow = {
+  raw_count: bigint;
+  machine_count: bigint;
+  first_capture: Date | null;
+  last_capture: Date | null;
+  current_time: Date;
+};
 
-  // Pipeline health: how much data have we captured, when was the last poll.
-  const pipeline = await db.$queryRaw<
-    Array<{
-      raw_count: bigint;
-      machine_count: bigint;
-      first_capture: Date | null;
-      last_capture: Date | null;
-      current_time: Date;
-    }>
-  >`
+function rangeCacheKey(range: ActiveRange): string {
+  return [
+    range.key,
+    range.from?.toISOString() ?? "start",
+    range.to?.toISOString() ?? "now",
+  ].join(":");
+}
+
+function loadLatestMachines() {
+  return cachedDashboardQuery("admin:latest-machines", 15_000, () =>
+    db.$queryRaw<MachineRow[]>`
+    WITH latest_location_snapshots AS (
+      SELECT DISTINCT ON ("locationSlug")
+        "locationSlug",
+        "snapshotId"
+      FROM location_observations
+      WHERE "locationSlug" IS NOT NULL
+      ORDER BY "locationSlug", "capturedAt" DESC
+    )
     SELECT
-      (SELECT COUNT(*)::bigint FROM raw_snapshots)          AS raw_count,
-      (SELECT COUNT(*)::bigint FROM machine_observations)   AS machine_count,
-      (SELECT MIN("capturedAt") FROM raw_snapshots)         AS first_capture,
-      (SELECT MAX("capturedAt") FROM raw_snapshots)         AS last_capture,
-      NOW()                                                  AS current_time
-  `;
+      m."locationSlug",
+      m."machineNumber",
+      m.kind,
+      m.status,
+      m."rawLabel",
+      m."remainingSeconds",
+      m."endsAt",
+      m."statusTimestamp",
+      m."isOnline",
+      m.rssi,
+      m."errorCode1",
+      m."errorCode2",
+      m."errorCode3",
+      m."isFirmwareUpdatePending",
+      m."firmwareFilename",
+      m."dateAdded",
+      NOW() AS "currentTime"
+    FROM machine_observations m
+    INNER JOIN latest_location_snapshots latest
+      ON latest."snapshotId" = m."snapshotId"
+     AND latest."locationSlug" = m."locationSlug"
+    ORDER BY m."locationSlug", m."machineNumber"
+  `,
+  );
+}
 
-  // Hourly utilization for the last 24h, per machine kind. Empty until we
-  // have a few hours of data.
-  const util = await db.$queryRaw<UtilBucket[]>`
+function loadPipeline() {
+  return cachedDashboardQuery("admin:pipeline", 30_000, async () => {
+    const rows = await db.$queryRaw<PipelineRow[]>`
+    SELECT
+      GREATEST(COALESCE((
+        SELECT reltuples::bigint FROM pg_class WHERE oid = 'raw_snapshots'::regclass
+      ), 0), 0) AS raw_count,
+      GREATEST(COALESCE((
+        SELECT reltuples::bigint FROM pg_class WHERE oid = 'machine_observations'::regclass
+      ), 0), 0) AS machine_count,
+      (SELECT "capturedAt" FROM raw_snapshots ORDER BY "capturedAt" ASC LIMIT 1) AS first_capture,
+      (SELECT "capturedAt" FROM raw_snapshots ORDER BY "capturedAt" DESC LIMIT 1) AS last_capture,
+      NOW() AS current_time
+    `;
+    return rows[0] ?? {
+      raw_count: BigInt(0),
+      machine_count: BigInt(0),
+      first_capture: null,
+      last_capture: null,
+      current_time: new Date(0),
+    };
+  });
+}
+
+function loadUtilization() {
+  return cachedDashboardQuery("admin:utilization-24h", 60_000, () =>
+    db.$queryRaw<UtilBucket[]>`
     SELECT
       DATE_TRUNC('hour', "capturedAt") AS bucket,
       kind,
@@ -137,11 +178,16 @@ async function loadDashboard(range: ActiveRange) {
       AND "capturedAt" > NOW() - INTERVAL '24 hours'
     GROUP BY 1, 2
     ORDER BY 1
-  `;
+  `,
+  );
+}
 
-  // Per-machine usage aggregate over the picked window. Everything the two
-  // analytics cards below need in a single scan.
-  const usage = await db.$queryRaw<UsageRow[]>`
+function loadUsage(range: ActiveRange) {
+  const rf = rangeFilter(range);
+  return cachedDashboardQuery(
+    `admin:usage:${rangeCacheKey(range)}`,
+    60_000,
+    () => db.$queryRaw<UsageRow[]>`
     SELECT
       "locationSlug",
       "machineNumber",
@@ -163,12 +209,16 @@ async function loadDashboard(range: ActiveRange) {
     WHERE kind IN ('washer', 'dryer')
       ${rf}
     GROUP BY "locationSlug", "machineNumber", kind
-  `;
+  `,
+  );
+}
 
-  // Error events inside the picked window — non-zero on any of the three
-  // codes. Top 50 most recent, so this doubles as an "all time" view when
-  // the range is set to All.
-  const errors = await db.$queryRaw<ErrorRow[]>`
+function loadErrors(range: ActiveRange) {
+  const rf = rangeFilter(range);
+  return cachedDashboardQuery(
+    `admin:errors:${rangeCacheKey(range)}`,
+    60_000,
+    () => db.$queryRaw<ErrorRow[]>`
     SELECT
       "capturedAt",
       "locationSlug",
@@ -184,21 +234,16 @@ async function loadDashboard(range: ActiveRange) {
       ${rf}
     ORDER BY "capturedAt" DESC
     LIMIT 50
-  `;
+  `,
+  );
+}
 
-  return {
-    latestMachines,
-    pipeline: pipeline[0] ?? {
-      raw_count: BigInt(0),
-      machine_count: BigInt(0),
-      first_capture: null,
-      last_capture: null,
-      current_time: new Date(0),
-    },
-    util,
-    errors,
-    usage,
-  };
+function loadHomepageMachineDisplay() {
+  return cachedDashboardQuery("admin:homepage-display", 15_000, async () =>
+    ((await kv.get<"summary" | "detailed" | "off">(
+      KV_KEYS.homepageMachineDisplay,
+    )) ?? "summary"),
+  );
 }
 
 // ---------- Usage / risk shaping -------------------------------------------
@@ -321,71 +366,23 @@ function Card({
   );
 }
 
-export default async function AdminDashboard(
-  props: {
-    searchParams: Promise<{ range?: string; from?: string; to?: string }>;
-  },
-) {
+export default async function AdminDashboard(props: {
+  searchParams: Promise<{
+    range?: string;
+    from?: string;
+    to?: string;
+    view?: string;
+  }>;
+}) {
   await requireAdminSessionOrRedirect();
-  const sp = await props.searchParams;
-  const range = parseRange(sp);
-
-  const { latestMachines, pipeline, util, errors, usage } = await loadDashboard(range);
-  const homepageMachineDisplay =
-    (await kv.get<"summary" | "detailed" | "off">(
-      KV_KEYS.homepageMachineDisplay,
-    )) ?? "summary";
-  const now = pipeline.current_time.getTime();
-
-  const usageMetrics = toUsageMetrics(usage);
-  const usageByLocation = new Map<string, UsageMetric[]>();
-  for (const m of usageMetrics) {
-    const slug = m.slug ?? "unknown";
-    if (!usageByLocation.has(slug)) usageByLocation.set(slug, []);
-    usageByLocation.get(slug)!.push(m);
-  }
-  // Repair-risk watchlist: any machine that showed an error OR spent >5% of
-  // the window offline OR is in the top quartile of usage (heavy wear).
-  const cyclesSorted = [...usageMetrics].sort((a, b) => b.cycles - a.cycles);
-  const q1Cycles = cyclesSorted[Math.floor(cyclesSorted.length / 4)]?.cycles ?? 0;
-  const watchlist = usageMetrics
-    .filter(
-      (m) =>
-        m.errorMinutes > 0 ||
-        m.offlinePct > 0.05 ||
-        (q1Cycles > 0 && m.cycles >= q1Cycles),
-    )
-    .sort((a, b) => b.wearScore - a.wearScore)
-    .slice(0, 10);
-
-  const knownSlugs = LOCATION_LIST.map((l) => l.slug);
-  const byLocation = new Map<string, MachineRow[]>();
-  for (const slug of knownSlugs) byLocation.set(slug, []);
-  for (const m of latestMachines) {
-    const slug = m.locationSlug ?? "unknown";
-    if (!byLocation.has(slug)) byLocation.set(slug, []);
-    byLocation.get(slug)!.push(m);
-  }
-
-  const summarise = (rows: MachineRow[]) => {
-    const washers = rows.filter((r) => r.kind === "washer");
-    const dryers = rows.filter((r) => r.kind === "dryer");
-    const other = rows.filter((r) => r.kind === "other");
-    return {
-      washerAvail: washers.filter((r) => r.status === "available").length,
-      washerTotal: washers.length,
-      washerOffline: washers.filter((r) => !r.isOnline).length,
-      dryerAvail: dryers.filter((r) => r.status === "available").length,
-      dryerTotal: dryers.length,
-      dryerOffline: dryers.filter((r) => !r.isOnline).length,
-      otherCount: other.length,
-      readerWeakSignals: rows.filter(
-        (r) => typeof r.rssi === "number" && r.rssi < 0,
-      ).length,
-      firmwareUpdates: rows.filter((r) => r.isFirmwareUpdatePending === true)
-        .length,
-    };
-  };
+  const searchParams = await props.searchParams;
+  const range = parseRange(searchParams);
+  const historicalView: HistoricalView | null =
+    searchParams.view === "rhythm" ||
+    searchParams.view === "usage" ||
+    searchParams.view === "errors"
+      ? searchParams.view
+      : null;
 
   return (
     <div className="space-y-5">
@@ -397,90 +394,128 @@ export default async function AdminDashboard(
           Dashboard
         </h1>
         <p className="mt-2 text-sm text-white/60">
-          Every LaundryCat data point, captured every 60 seconds. Nothing is
-          ever pruned — history grows forever.
+          The dashboard appears immediately. Live database cards fill in as
+          their data arrives; historical reports run only when requested.
         </p>
       </div>
 
-      <Card
-        title="Website traffic — private analytics"
-        subtitle="A private customer-safe dashboard for 123-laundry.com, built directly into this admin."
-      >
-        <div className="rounded-2xl border border-brand-200/20 bg-linear-to-br from-brand/15 via-brand/5 to-transparent p-4 md:p-5">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-            <div className="max-w-2xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-brand-200/25 bg-brand/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-100">
-                <span className="size-2 rounded-full bg-emerald-300" />
-                First-party admin report
-              </div>
-              <p className="mt-3 text-sm leading-relaxed text-white/75">
-                See live visitors, sessions, page views, engagement, top pages,
-                traffic sources, countries, devices, browsers, and operating
-                systems without opening Vercel or seeing any other project.
-              </p>
-            </div>
-            <Link
-              href="/admin/website-analytics"
-              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
-            >
-              View website traffic →
-            </Link>
-          </div>
-          <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-relaxed text-white/50">
-            Uses the existing admin password. Collection starts with this
-            launch; no Google or Vercel account is required.
-          </p>
-        </div>
-      </Card>
+      <WebsiteTrafficCard />
 
-      {/* ============================ LIVE ============================
-          Current state of the stores. Numbers here reflect the most
-          recent poll — they don't depend on the historical range picker
-          below. */}
       <SectionDivider
         label="Live · right now"
-        hint="Current state as of the last poll. Not affected by the time-range picker below."
+        hint="Each box loads independently. A slow database section cannot hold up or crash the rest of the page."
       />
 
-      <Card
-        title="Homepage machine display"
-        subtitle="This only changes what customers see on the homepage. Collection, history, and this admin dashboard always keep running."
-      >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-white">
-              Currently showing:{" "}
-              <span className="text-brand-200">
-                {homepageMachineDisplay === "detailed"
-                  ? "Detailed live machines"
-                  : homepageMachineDisplay === "summary"
-                    ? "Friendly activity summary"
-                    : "Hidden completely"}
-              </span>
-            </p>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-white/55">
-              The friendly summary groups live usage into four positive
-              activity levels without publishing machine counts or timers.
-              Detailed mode restores the original homepage floor exactly.
+      <Suspense fallback={<DashboardCardSkeleton title="Homepage machine display" />}>
+        <HomepageDisplayCard />
+      </Suspense>
+      <Suspense fallback={<DashboardCardSkeleton title="Data pipeline" />}>
+        <PipelineCard />
+      </Suspense>
+      <Suspense fallback={<LiveMachinesSkeleton />}>
+        <LiveMachineCards />
+      </Suspense>
+
+      <SectionDivider
+        label="Historical analytics · load on request"
+        hint="No historical database query runs until you choose one report below."
+      />
+      <HistoricalViewPicker active={historicalView} />
+
+      {historicalView && (
+        <>
+          {historicalView !== "rhythm" && (
+            <RangePicker
+              active={range}
+              persistentParams={{ view: historicalView }}
+            />
+          )}
+          {historicalView === "rhythm" ? (
+            <Suspense fallback={<DashboardCardSkeleton title="Today's rhythm — last 24h" tall />}>
+              <UtilizationCard />
+            </Suspense>
+          ) : historicalView === "usage" ? (
+            <Suspense fallback={<HistoricalUsageSkeleton />}>
+              <HistoricalUsageCards range={range} />
+            </Suspense>
+          ) : (
+            <Suspense fallback={<DashboardCardSkeleton title={`Errors — ${range.label}`} tall />}>
+              <HistoricalErrorsCard range={range} />
+            </Suspense>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function WebsiteTrafficCard() {
+  return (
+    <Card
+      title="Website traffic — private analytics"
+      subtitle="A private customer-safe dashboard for 123-laundry.com, built directly into this admin."
+    >
+      <div className="rounded-2xl border border-brand-200/20 bg-linear-to-br from-brand/15 via-brand/5 to-transparent p-4 md:p-5">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-brand-200/25 bg-brand/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-100">
+              <span className="size-2 rounded-full bg-emerald-300" />
+              First-party admin report
+            </div>
+            <p className="mt-3 text-sm leading-relaxed text-white/75">
+              See live visitors, sessions, page views, engagement, top pages,
+              traffic sources, countries, devices, browsers, and operating
+              systems without opening Vercel or seeing any other project.
             </p>
           </div>
+          <Link
+            href="/admin/website-analytics"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          >
+            View website traffic →
+          </Link>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+async function HomepageDisplayCard() {
+  let mode: "summary" | "detailed" | "off";
+  try {
+    mode = await loadHomepageMachineDisplay();
+  } catch {
+    return <SectionLoadError title="Homepage machine display" />;
+  }
+  return (
+      <Card
+        title="Homepage machine display"
+        subtitle="This changes what customers see; collection and history keep running."
+      >
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <p className="text-sm font-semibold text-white">
+            Currently showing:{" "}
+            <span className="text-brand-200">
+              {mode === "detailed"
+                ? "Detailed live machines"
+                : mode === "summary"
+                  ? "Friendly activity summary"
+                  : "Hidden completely"}
+            </span>
+          </p>
           <div className="flex flex-wrap gap-2">
             {[
               { mode: "summary", label: "Friendly summary" },
               { mode: "detailed", label: "Detailed machines" },
               { mode: "off", label: "Hide section" },
             ].map((option) => (
-              <form
-                key={option.mode}
-                action="/admin/homepage-status"
-                method="post"
-              >
+              <form key={option.mode} action="/admin/homepage-status" method="post">
                 <input type="hidden" name="mode" value={option.mode} />
                 <button
                   type="submit"
-                  disabled={homepageMachineDisplay === option.mode}
+                  disabled={mode === option.mode}
                   className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${
-                    homepageMachineDisplay === option.mode
+                    mode === option.mode
                       ? "cursor-default bg-brand text-white"
                       : "border border-white/15 bg-white/5 text-white/75 hover:border-brand-200 hover:text-brand-200"
                   }`}
@@ -492,317 +527,315 @@ export default async function AdminDashboard(
           </div>
         </div>
       </Card>
+  );
+}
 
-      {/* PIPELINE STATUS */}
+async function PipelineCard() {
+  let pipeline: PipelineRow;
+  try {
+    pipeline = await loadPipeline();
+  } catch {
+    return <SectionLoadError title="Data pipeline" />;
+  }
+  const now = pipeline.current_time.getTime();
+  return (
       <Card
         title="Data pipeline"
-        subtitle="How much history we've collected so far."
+        subtitle="Approximate stored-row totals and exact first/last poll times."
       >
         <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <div>
-            <dt className="text-white/50">Raw polls</dt>
-            <dd className="mt-0.5 font-display text-xl font-bold text-white">
-              {pipeline.raw_count.toString()}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-white/50">Machine rows</dt>
-            <dd className="mt-0.5 font-display text-xl font-bold text-white">
-              {pipeline.machine_count.toString()}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-white/50">Last poll</dt>
-            <dd className="mt-0.5 font-display text-base font-bold text-white">
-              {pipeline.last_capture
-                ? `${formatDuration(now - pipeline.last_capture.getTime())} ago`
-                : "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-white/50">First poll</dt>
-            <dd className="mt-0.5 font-display text-base font-bold text-white">
-              {pipeline.first_capture
-                ? pipeline.first_capture.toLocaleString()
-                : "—"}
-            </dd>
-          </div>
+          <PipelineMetric label="Raw polls" value={pipeline.raw_count.toString()} />
+          <PipelineMetric label="Machine rows" value={pipeline.machine_count.toString()} />
+          <PipelineMetric
+            label="Last poll"
+            value={pipeline.last_capture ? `${formatDuration(now - pipeline.last_capture.getTime())} ago` : "—"}
+          />
+          <PipelineMetric
+            label="First poll"
+            value={pipeline.first_capture ? pipeline.first_capture.toLocaleString() : "—"}
+          />
         </dl>
       </Card>
+  );
+}
 
-      {/* PER-LOCATION LIVE OVERVIEW */}
-      {Array.from(byLocation.entries()).map(([slug, rows]) => {
-        const s = summarise(rows);
-        const loc = LOCATION_LIST.find((l) => l.slug === slug);
-        if (rows.length === 0) return null;
-        return (
-          <Card
-            key={slug}
-            title={loc?.name ?? slug}
-            subtitle={loc?.fullAddress ?? ""}
-          >
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-xl bg-white/5 p-3">
-                <div className="font-display text-3xl font-black text-emerald-200">
-                  {s.washerAvail}
-                  <span className="text-lg text-white/50">/{s.washerTotal}</span>
-                </div>
-                <div className="mt-1 text-[11px] uppercase tracking-wider text-white/60">
-                  Washers open
-                </div>
-              </div>
-              <div className="rounded-xl bg-white/5 p-3">
-                <div className="font-display text-3xl font-black text-emerald-200">
-                  {s.dryerAvail}
-                  <span className="text-lg text-white/50">/{s.dryerTotal}</span>
-                </div>
-                <div className="mt-1 text-[11px] uppercase tracking-wider text-white/60">
-                  Dryers open
-                </div>
-              </div>
-              <div className="rounded-xl bg-white/5 p-3">
-                <div className="font-display text-3xl font-black text-white">
-                  {s.otherCount}
-                </div>
-                <div className="mt-1 text-[11px] uppercase tracking-wider text-white/60">
-                  Companions
-                </div>
-              </div>
-            </div>
-            {(s.washerOffline > 0 ||
-              s.dryerOffline > 0 ||
-              s.firmwareUpdates > 0) && (
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                {s.washerOffline > 0 && (
-                  <span className="rounded-full bg-red-500/15 px-2 py-1 text-red-300">
-                    {s.washerOffline} washer{s.washerOffline > 1 ? "s" : ""} offline
-                  </span>
-                )}
-                {s.dryerOffline > 0 && (
-                  <span className="rounded-full bg-red-500/15 px-2 py-1 text-red-300">
-                    {s.dryerOffline} dryer{s.dryerOffline > 1 ? "s" : ""} offline
-                  </span>
-                )}
-                {s.firmwareUpdates > 0 && (
-                  <span className="rounded-full bg-amber-400/20 px-2 py-1 text-amber-200">
-                    {s.firmwareUpdates} firmware update pending
-                  </span>
-                )}
-              </div>
-            )}
-          </Card>
-        );
-      })}
+function PipelineMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-white/50">{label}</dt>
+      <dd className="mt-0.5 font-display text-base font-bold text-white md:text-xl">
+        {value}
+      </dd>
+    </div>
+  );
+}
 
-      {/* MACHINE ROSTER (live — one card per store) */}
-      {Array.from(byLocation.entries()).map(([slug, rows]) => {
-        if (rows.length === 0) return null;
-        const loc = LOCATION_LIST.find((l) => l.slug === slug);
-        return (
-          <Card
-            key={`roster-${slug}`}
-            title={`Machine roster — ${loc?.city ?? slug}`}
-            subtitle="Current state of every machine. Sorted by number."
-          >
-            <ul className="divide-y divide-white/5">
-              {rows
-                .slice()
-                .sort((a, b) => a.machineNumber.localeCompare(b.machineNumber))
-                .map((m) => (
-                  <li
-                    key={`${slug}-${m.machineNumber}`}
-                    className="grid grid-cols-[minmax(0,72px)_1fr_auto] items-center gap-3 py-2.5 text-sm"
-                  >
+function summarizeMachines(rows: MachineRow[]) {
+  const washers = rows.filter((row) => row.kind === "washer");
+  const dryers = rows.filter((row) => row.kind === "dryer");
+  return {
+    washerAvail: washers.filter((row) => row.status === "available").length,
+    washerTotal: washers.length,
+    washerOffline: washers.filter((row) => !row.isOnline).length,
+    dryerAvail: dryers.filter((row) => row.status === "available").length,
+    dryerTotal: dryers.length,
+    dryerOffline: dryers.filter((row) => !row.isOnline).length,
+    otherCount: rows.filter((row) => row.kind === "other").length,
+    firmwareUpdates: rows.filter((row) => row.isFirmwareUpdatePending === true)
+      .length,
+  };
+}
+
+async function LiveMachineCards() {
+  let machines: MachineRow[];
+  try {
+    machines = await loadLatestMachines();
+  } catch {
+    return <SectionLoadError title="Live machine status" />;
+  }
+  const now = machines[0]?.currentTime.getTime() ?? 0;
+  const byLocation = new Map<string, MachineRow[]>();
+  for (const location of LOCATION_LIST) byLocation.set(location.slug, []);
+  for (const machine of machines) {
+    const slug = machine.locationSlug ?? "unknown";
+    if (!byLocation.has(slug)) byLocation.set(slug, []);
+    byLocation.get(slug)!.push(machine);
+  }
+
+  return (
+      <>
+        {Array.from(byLocation.entries()).map(([slug, rows]) => {
+          if (rows.length === 0) return null;
+          const summary = summarizeMachines(rows);
+          const location = LOCATION_LIST.find((item) => item.slug === slug);
+          return (
+            <Card key={slug} title={location?.name ?? slug} subtitle={location?.fullAddress ?? ""}>
+              <div className="grid grid-cols-3 gap-2 text-center md:gap-3">
+                <AvailabilityMetric value={summary.washerAvail} total={summary.washerTotal} label="Washers open" />
+                <AvailabilityMetric value={summary.dryerAvail} total={summary.dryerTotal} label="Dryers open" />
+                <AvailabilityMetric value={summary.otherCount} label="Companions" />
+              </div>
+              {(summary.washerOffline > 0 || summary.dryerOffline > 0 || summary.firmwareUpdates > 0) && (
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  {summary.washerOffline > 0 && <StatusWarning>{summary.washerOffline} washer offline</StatusWarning>}
+                  {summary.dryerOffline > 0 && <StatusWarning>{summary.dryerOffline} dryer offline</StatusWarning>}
+                  {summary.firmwareUpdates > 0 && <StatusWarning amber>{summary.firmwareUpdates} firmware update pending</StatusWarning>}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+
+        {Array.from(byLocation.entries()).map(([slug, rows]) => {
+          if (rows.length === 0) return null;
+          const location = LOCATION_LIST.find((item) => item.slug === slug);
+          return (
+            <Card key={`roster-${slug}`} title={`Machine roster — ${location?.city ?? slug}`} subtitle="Current state of every machine. Sorted by number.">
+              <ul className="divide-y divide-white/5">
+                {rows.slice().sort((a, b) => a.machineNumber.localeCompare(b.machineNumber)).map((machine) => (
+                  <li key={`${slug}-${machine.machineNumber}`} className="grid grid-cols-[minmax(0,72px)_1fr_auto] items-center gap-3 py-2.5 text-sm">
                     <div>
-                      <div className="font-mono text-base font-bold text-white">
-                        {m.machineNumber}
-                      </div>
-                      <div className="text-[10px] uppercase tracking-wider text-white/50">
-                        {m.kind}
-                      </div>
+                      <div className="font-mono text-base font-bold text-white">{machine.machineNumber}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/50">{machine.kind}</div>
                     </div>
                     <div className="min-w-0">
-                      <StatusPill status={m.status} isOnline={m.isOnline} />
-                      {m.status === "busy" && m.remainingSeconds != null && (
-                        <span className="ml-2 text-xs text-white/60">
-                          {formatDuration(m.remainingSeconds * 1000)} left
-                        </span>
+                      <StatusPill status={machine.status} isOnline={machine.isOnline} />
+                      {machine.status === "busy" && machine.remainingSeconds != null && (
+                        <span className="ml-2 text-xs text-white/60">{formatDuration(machine.remainingSeconds * 1000)} left</span>
                       )}
-                      {m.statusTimestamp && (
+                      {machine.statusTimestamp && now > 0 && (
                         <div className="mt-0.5 truncate text-[11px] text-white/40">
-                          since{" "}
-                          {formatDuration(
-                            now - m.statusTimestamp.getTime(),
-                          )}{" "}
-                          ago
+                          since {formatDuration(now - machine.statusTimestamp.getTime())} ago
                         </div>
                       )}
                     </div>
                     <div className="text-right text-[11px] text-white/40">
-                      {typeof m.rssi === "number" && (
-                        <div>RSSI {m.rssi}</div>
-                      )}
-                      {m.isFirmwareUpdatePending && (
-                        <div className="text-amber-200">FW pending</div>
-                      )}
+                      {typeof machine.rssi === "number" && <div>RSSI {machine.rssi}</div>}
+                      {machine.isFirmwareUpdatePending && <div className="text-amber-200">FW pending</div>}
                     </div>
                   </li>
                 ))}
-            </ul>
-          </Card>
-        );
-      })}
+              </ul>
+            </Card>
+          );
+        })}
+      </>
+  );
+}
 
-      {/* TODAY'S RHYTHM — fixed 24h view, doesn't respond to the picker.
-          Kept in the LIVE section because "the last day" reads as current
-          activity to the owner, not as a historical trend. */}
-      <Card
-        title="Today's rhythm — last 24h"
-        subtitle="Share of machines busy, bucketed by hour and by kind. Fixed 24-hour view."
-      >
+function AvailabilityMetric({ value, total, label }: { value: number; total?: number; label: string }) {
+  return (
+    <div className="rounded-xl bg-white/5 p-2.5 md:p-3">
+      <div className="font-display text-2xl font-black text-emerald-200 md:text-3xl">
+        {value}
+        {total != null && <span className="text-base text-white/50 md:text-lg">/{total}</span>}
+      </div>
+      <div className="mt-1 text-[10px] uppercase tracking-wider text-white/60 md:text-[11px]">{label}</div>
+    </div>
+  );
+}
+
+function StatusWarning({ children, amber = false }: { children: React.ReactNode; amber?: boolean }) {
+  return (
+    <span className={`rounded-full px-2 py-1 ${amber ? "bg-amber-400/20 text-amber-200" : "bg-red-500/15 text-red-300"}`}>
+      {children}
+    </span>
+  );
+}
+
+async function UtilizationCard() {
+  let util: UtilBucket[];
+  try {
+    util = await loadUtilization();
+  } catch {
+    return <SectionLoadError title="Today's rhythm — last 24h" />;
+  }
+  return (
+      <Card title="Today's rhythm — last 24h" subtitle="Share of machines busy, bucketed by hour and by kind. Fixed 24-hour view.">
         {util.length === 0 ? (
-          <p className="text-sm text-white/60">
-            Not enough history yet — chart will populate as data accumulates.
-          </p>
+          <p className="text-sm text-white/60">Not enough history yet — chart will populate as data accumulates.</p>
         ) : (
           <UtilChart util={util} />
         )}
       </Card>
+  );
+}
 
-      {/* ========================= HISTORICAL =========================
-          Everything below responds to the RangePicker. Loading state is
-          shown inside the picker so it's obvious a query is in flight. */}
-      <SectionDivider
-        label="Historical analytics"
-        hint="Pick a window and every card below updates. Watch the spinner in the picker so you know when it's done."
-      />
+async function HistoricalUsageCards({ range }: { range: ActiveRange }) {
+  let usage: UsageRow[];
+  try {
+    usage = await loadUsage(range);
+  } catch {
+    return <SectionLoadError title={`Usage and repair risk — ${range.label}`} />;
+  }
+  const metrics = toUsageMetrics(usage);
+  const byLocation = new Map<string, UsageMetric[]>();
+  for (const metric of metrics) {
+    const slug = metric.slug ?? "unknown";
+    if (!byLocation.has(slug)) byLocation.set(slug, []);
+    byLocation.get(slug)!.push(metric);
+  }
+  const cyclesSorted = [...metrics].sort((a, b) => b.cycles - a.cycles);
+  const threshold = cyclesSorted[Math.floor(cyclesSorted.length / 4)]?.cycles ?? 0;
+  const watchlist = metrics
+    .filter((metric) => metric.errorMinutes > 0 || metric.offlinePct > 0.05 || (threshold > 0 && metric.cycles >= threshold))
+    .sort((a, b) => b.wearScore - a.wearScore)
+    .slice(0, 10);
 
-      <RangePicker active={range} />
-
-      {/* USAGE RANKING */}
-      <Card
-        title={`Machine usage — ${range.label}`}
-        subtitle="Which machines are pulling weight, which are barely touched. Cycles are load starts; run time is total minutes turning."
-      >
-        {usageMetrics.length === 0 ? (
-          <p className="text-sm text-white/60">
-            No usage data yet. Ranked lists appear as poll history builds up.
-          </p>
-        ) : (
-          <div className="space-y-5">
-            {Array.from(usageByLocation.entries()).map(([slug, rows]) => {
-              const loc = LOCATION_LIST.find((l) => l.slug === slug);
-              return (
-                <div key={`usage-${slug}`}>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-brand-200">
-                    {loc?.city ?? slug}
-                  </h3>
-                  {(["washer", "dryer"] as const).map((kind) => (
-                    <UsageGroup
-                      key={`usage-${slug}-${kind}`}
-                      kind={kind}
-                      rows={rows.filter((r) => r.kind === kind)}
-                    />
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* REPAIR-RISK WATCHLIST */}
-      <Card
-        title={`Repair-risk watchlist — ${range.label}`}
-        subtitle="Composite of cycles (wear), error events, and offline time. Higher score = more attention worth giving."
-      >
-        {watchlist.length === 0 ? (
-          <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">
-            No machines flagging. Once we have more history, the top wear +
-            repair-risk machines will appear here.
-          </p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {watchlist.map((m) => {
-              const reasons: string[] = [];
-              if (m.errorMinutes > 0)
-                reasons.push(`${m.errorMinutes}m in error`);
-              if (m.offlinePct > 0.05)
-                reasons.push(`${Math.round(m.offlinePct * 100)}% offline`);
-              if (m.cycles > 0) reasons.push(`${m.cycles} cycles`);
-              if (typeof m.worstRssi === "number" && m.worstRssi < -80)
-                reasons.push(`weak signal ${m.worstRssi} dBm`);
-              return (
-                <li
-                  key={`risk-${m.slug}-${m.id}`}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5 text-sm"
-                >
-                  <div>
-                    <div className="font-mono text-base font-bold text-white">
-                      {m.id}
+  return (
+      <>
+        <Card title={`Machine usage — ${range.label}`} subtitle="Cycles and runtime by machine. Loaded only on request.">
+          {metrics.length === 0 ? (
+            <p className="text-sm text-white/60">No usage data in this window.</p>
+          ) : (
+            <div className="space-y-5">
+              {Array.from(byLocation.entries()).map(([slug, rows]) => {
+                const location = LOCATION_LIST.find((item) => item.slug === slug);
+                return (
+                  <div key={`usage-${slug}`}>
+                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-brand-200">{location?.city ?? slug}</h3>
+                    {(["washer", "dryer"] as const).map((kind) => (
+                      <UsageGroup key={`usage-${slug}-${kind}`} kind={kind} rows={rows.filter((row) => row.kind === kind)} />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+        <Card title={`Repair-risk watchlist — ${range.label}`} subtitle="Composite of cycles, error events, and offline time.">
+          {watchlist.length === 0 ? (
+            <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">No machines are flagging in this window.</p>
+          ) : (
+            <ul className="divide-y divide-white/5">
+              {watchlist.map((machine) => {
+                const reasons: string[] = [];
+                if (machine.errorMinutes > 0) reasons.push(`${machine.errorMinutes}m in error`);
+                if (machine.offlinePct > 0.05) reasons.push(`${Math.round(machine.offlinePct * 100)}% offline`);
+                if (machine.cycles > 0) reasons.push(`${machine.cycles} cycles`);
+                return (
+                  <li key={`risk-${machine.slug}-${machine.id}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2.5 text-sm">
+                    <div>
+                      <div className="font-mono text-base font-bold text-white">{machine.id}</div>
+                      <div className="text-[10px] uppercase tracking-wider text-white/50">{machine.kind} · {machine.slug ?? "?"}</div>
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider text-white/50">
-                      {m.kind} · {m.slug ?? "?"}
-                    </div>
-                  </div>
-                  <div className="min-w-0 text-xs text-white/70">
-                    {reasons.join(" · ")}
-                  </div>
-                  <div
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                      m.errorMinutes > 0
-                        ? "bg-red-500/20 text-red-200"
-                        : m.offlinePct > 0.05
-                          ? "bg-amber-400/20 text-amber-200"
-                          : "bg-white/10 text-white/70"
-                    }`}
-                    title="Composite wear-and-tear score"
-                  >
-                    {m.wearScore}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+                    <div className="min-w-0 text-xs text-white/70">{reasons.join(" · ")}</div>
+                    <div className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold text-white/70">{machine.wearScore}</div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
+      </>
+  );
+}
 
-      {/* ERROR TRACKER (scoped to picker window) */}
-      <Card
-        title={`Errors — ${range.label}`}
-        subtitle="Any machine that reported a non-zero error code inside the selected window. Most recent first, top 50."
-      >
+async function HistoricalErrorsCard({ range }: { range: ActiveRange }) {
+  let errors: ErrorRow[];
+  try {
+    errors = await loadErrors(range);
+  } catch {
+    return <SectionLoadError title={`Errors — ${range.label}`} />;
+  }
+  return (
+      <Card title={`Errors — ${range.label}`} subtitle="Non-zero LaundryCat error codes. Most recent first, top 50.">
         {errors.length === 0 ? (
-          <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">
-            No error codes in this window. All machines healthy.
-          </p>
+          <p className="rounded-xl bg-emerald-400/10 px-3 py-4 text-sm text-emerald-200">No error codes in this window. All machines healthy.</p>
         ) : (
           <ul className="divide-y divide-white/5">
-            {errors.slice(0, 20).map((e, idx) => (
-              <li
-                key={`${e.capturedAt.toISOString()}-${e.machineNumber}-${idx}`}
-                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2 text-sm"
-              >
-                <span className="font-mono text-xs text-white/50">
-                  {e.capturedAt.toLocaleString()}
-                </span>
-                <span className="text-white">
-                  <b>{e.machineNumber}</b>{" "}
-                  <span className="text-white/50">
-                    ({e.locationSlug ?? "?"})
-                  </span>
-                </span>
+            {errors.slice(0, 20).map((error, index) => (
+              <li key={`${error.capturedAt.toISOString()}-${error.machineNumber}-${index}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 py-2 text-sm">
+                <span className="font-mono text-xs text-white/50">{error.capturedAt.toLocaleString()}</span>
+                <span className="text-white"><b>{error.machineNumber}</b> <span className="text-white/50">({error.locationSlug ?? "?"})</span></span>
                 <span className="rounded bg-red-500/15 px-2 py-0.5 text-xs text-red-300">
-                  {[e.errorCode1, e.errorCode2, e.errorCode3]
-                    .filter((c) => c != null && c !== 0)
-                    .join(" / ")}
+                  {[error.errorCode1, error.errorCode2, error.errorCode3].filter((code) => code != null && code !== 0).join(" / ")}
                 </span>
               </li>
             ))}
           </ul>
         )}
       </Card>
-    </div>
+  );
+}
+
+function DashboardCardSkeleton({ title, tall = false }: { title: string; tall?: boolean }) {
+  return (
+    <section className={`animate-pulse rounded-2xl border border-white/10 bg-ink-soft p-4 md:p-5 ${tall ? "min-h-48" : "min-h-32"}`} aria-busy="true" aria-label={`Loading ${title}`}>
+      <h2 className="font-display text-base font-bold text-white/70 md:text-lg">{title}</h2>
+      <div className="mt-3 h-3 w-64 max-w-full rounded bg-white/10" />
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => <div key={item} className="h-14 rounded-xl bg-white/5" />)}
+      </div>
+    </section>
+  );
+}
+
+function LiveMachinesSkeleton() {
+  return (
+    <>
+      <DashboardCardSkeleton title="Deer Park live machines" tall />
+      <DashboardCardSkeleton title="Spokane Valley live machines" tall />
+    </>
+  );
+}
+
+function HistoricalUsageSkeleton() {
+  return (
+    <>
+      <DashboardCardSkeleton title="Machine usage" tall />
+      <DashboardCardSkeleton title="Repair-risk watchlist" tall />
+    </>
+  );
+}
+
+function SectionLoadError({ title }: { title: string }) {
+  return (
+    <Card title={title} subtitle="The rest of the dashboard is still available.">
+      <p className="rounded-xl border border-amber-300/20 bg-amber-300/10 px-3 py-4 text-sm text-amber-100">
+        This box could not load. Reload once to retry; repeated clicks are automatically coalesced.
+      </p>
+    </Card>
   );
 }
 

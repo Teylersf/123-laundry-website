@@ -54,6 +54,15 @@ stores random visitor/session IDs and aggregate request metadata, but never raw
 IP addresses, raw user-agent strings, names, emails, phone numbers, or LaundryCat
 identifiers. No third-party analytics account or reporting credential is needed.
 
+## Admin dashboard loading
+
+`/admin` streams an authenticated shell immediately, then fills independent
+live-data cards through short-lived, request-coalescing database reads. The
+production Prisma pool intentionally has one connection, so dashboard reads are
+serialized inside each warm server instance instead of competing until they
+time out. Historical rhythm, usage/risk, and error reports are opt-in and do not
+query PostgreSQL until the owner selects the corresponding report button.
+
 ## Getting started
 
 ```bash
