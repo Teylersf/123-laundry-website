@@ -118,3 +118,36 @@ model MachineObservation {
   @@index([statusTimestamp])
   @@map("machine_observations")
 }
+
+// Privacy-safe, first-party website analytics. We intentionally store no IP
+// address, raw user-agent string, name, email, phone number, or LaundryCat
+// identifier. Browser-generated random IDs provide aggregate visitor/session
+// counts without connecting website activity to a customer identity.
+model WebAnalyticsEvent {
+  id              BigInt   @id @default(autoincrement())
+  eventId         String   @unique
+  occurredAt      DateTime @default(now())
+  visitorId       String
+  sessionId       String
+  isLanding       Boolean  @default(false)
+  path            String
+  title           String?
+  referrerHost    String?
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  country         String?
+  deviceCategory  String
+  browser         String
+  operatingSystem String
+  screenWidth     Int?
+
+  @@index([occurredAt])
+  @@index([path, occurredAt])
+  @@index([sessionId, occurredAt])
+  @@index([visitorId, occurredAt])
+  @@index([referrerHost, occurredAt])
+  @@index([country, occurredAt])
+  @@index([deviceCategory, occurredAt])
+  @@map("web_analytics_events")
+}

@@ -41,7 +41,18 @@ This site is a static-rendered marketing site built for SEO and mobile.
 - **[Tailwind CSS v4](https://tailwindcss.com/)**
 - **[Source Sans 3](https://fonts.google.com/specimen/Source+Sans+3)** (body) + **[Montserrat](https://fonts.google.com/specimen/Montserrat)** (display) via `next/font/google`
 - **[Prisma 5.22](https://www.prisma.io/)** + **[Resend](https://resend.com/)** ready for future contact-form / waitlist features
+- **Private first-party analytics** stored in PostgreSQL, with bot filtering via
+  `isbot` and aggregate browser/device classification via `ua-parser-js`
 - JSON-LD `LocalBusiness` schema for both locations, FAQ structured data, programmatic OG image, full XML sitemap, and `robots.txt`
+
+## Website analytics
+
+The customer-facing report lives at `/admin/website-analytics` and uses the
+same signed admin session as the machine dashboard. Public page views are sent
+to `/api/analytics`; `/admin` traffic and known bots are excluded. The collector
+stores random visitor/session IDs and aggregate request metadata, but never raw
+IP addresses, raw user-agent strings, names, emails, phone numbers, or LaundryCat
+identifiers. No third-party analytics account or reporting credential is needed.
 
 ## Getting started
 

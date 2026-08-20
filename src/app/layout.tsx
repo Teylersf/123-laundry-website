@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { LocalBusinessJsonLd } from "@/components/local-business-jsonld";
 import { ChromeGate } from "@/components/chrome-gate";
+import { FirstPartyAnalytics } from "@/components/first-party-analytics";
 import { BUSINESS, SITE_URL } from "@/lib/site-data";
 
 const GOOGLE_TAG_MANAGER_ID = "GTM-PGJVMT4M";
@@ -139,6 +140,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           <SiteFooter />
           <LocalBusinessJsonLd />
         </ChromeGate>
+        <FirstPartyAnalytics />
         <Analytics />
       </body>
     </html>

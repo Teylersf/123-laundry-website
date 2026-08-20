@@ -12,7 +12,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-ink text-paper">
       <header className="border-b border-white/10 bg-ink-soft/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           {/* Logo → public homepage; admin title → admin dashboard.
               Two separate tap targets so the owner can jump back to the
               customer-facing site without leaving the admin app entirely. */}
@@ -38,10 +38,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <span className="text-brand-200">admin</span>
             </Link>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/admin/website-analytics"
+              className="rounded-full border border-brand-200/40 px-3 py-1.5 text-xs font-semibold text-brand-100 hover:border-brand-200 hover:text-white"
+            >
+              Traffic
+            </Link>
             <Link
               href="/admin/billing"
-              className="rounded-full border border-brand-200/40 px-3 py-1.5 text-xs font-semibold text-brand-100 hover:border-brand-200 hover:text-white"
+              className="rounded-full border border-white/15 px-3 py-1.5 text-xs font-semibold text-white/80 hover:border-brand-200 hover:text-brand-100"
             >
               Billing
             </Link>

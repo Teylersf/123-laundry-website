@@ -7,23 +7,25 @@
 
 import { useRouter } from "next/navigation";
 import {
-  useEffect,
   useState,
   useTransition,
   type FormEvent,
 } from "react";
 import { RANGES, type ActiveRange } from "./_range";
 
-export function RangePicker({ active }: { active: ActiveRange }) {
+export function RangePicker({
+  active,
+  basePath = "/admin",
+}: {
+  active: ActiveRange;
+  basePath?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   // Which specific chip / form is being loaded — used so only that one
   // shows a spinner rather than the whole row.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!pending) setPendingKey(null);
-  }, [pending]);
+  const visiblePendingKey = pending ? pendingKey : null;
 
   function pick(key: string, href: string) {
     if (pending) return;
@@ -43,7 +45,7 @@ export function RangePicker({ active }: { active: ActiveRange }) {
     setPendingKey("custom");
     startTransition(() => {
       router.push(
-        `/admin?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        `${basePath}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
       );
     });
   }
@@ -65,12 +67,12 @@ export function RangePicker({ active }: { active: ActiveRange }) {
       <div className="mt-2 flex flex-wrap gap-1.5">
         {RANGES.map((r) => {
           const isActive = active.key === r.key;
-          const isPendingChip = pendingKey === r.key;
+          const isPendingChip = visiblePendingKey === r.key;
           return (
             <button
               key={r.key}
               type="button"
-              onClick={() => pick(r.key, `/admin?range=${r.key}`)}
+              onClick={() => pick(r.key, `${basePath}?range=${r.key}`)}
               disabled={pending}
               aria-pressed={isActive}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
@@ -122,7 +124,7 @@ export function RangePicker({ active }: { active: ActiveRange }) {
             disabled={pending}
             className="inline-flex items-center justify-center gap-1.5 self-end rounded-lg bg-brand-200 px-3 py-2 text-xs font-bold text-ink hover:bg-brand-100 disabled:opacity-70"
           >
-            {pendingKey === "custom" ? (
+            {visiblePendingKey === "custom" ? (
               <>
                 <Spinner ink />
                 Loading…

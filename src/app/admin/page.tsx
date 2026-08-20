@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdminSessionOrRedirect } from "@/lib/admin-auth";
@@ -15,9 +16,6 @@ export const metadata: Metadata = {
 // The admin surface is data-driven — never precompute.
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const VERCEL_ANALYTICS_URL =
-  "https://vercel.com/teylerks-projects/123-laundry/analytics";
 
 // SQL fragment for the WHERE clause. Empty when "all time" so Postgres does
 // not add a bogus lower bound.
@@ -116,13 +114,15 @@ async function loadDashboard(range: ActiveRange) {
       machine_count: bigint;
       first_capture: Date | null;
       last_capture: Date | null;
+      current_time: Date;
     }>
   >`
     SELECT
       (SELECT COUNT(*)::bigint FROM raw_snapshots)          AS raw_count,
       (SELECT COUNT(*)::bigint FROM machine_observations)   AS machine_count,
       (SELECT MIN("capturedAt") FROM raw_snapshots)         AS first_capture,
-      (SELECT MAX("capturedAt") FROM raw_snapshots)         AS last_capture
+      (SELECT MAX("capturedAt") FROM raw_snapshots)         AS last_capture,
+      NOW()                                                  AS current_time
   `;
 
   // Hourly utilization for the last 24h, per machine kind. Empty until we
@@ -193,6 +193,7 @@ async function loadDashboard(range: ActiveRange) {
       machine_count: BigInt(0),
       first_capture: null,
       last_capture: null,
+      current_time: new Date(0),
     },
     util,
     errors,
@@ -334,7 +335,7 @@ export default async function AdminDashboard(
     (await kv.get<"summary" | "detailed" | "off">(
       KV_KEYS.homepageMachineDisplay,
     )) ?? "summary";
-  const now = Date.now();
+  const now = pipeline.current_time.getTime();
 
   const usageMetrics = toUsageMetrics(usage);
   const usageByLocation = new Map<string, UsageMetric[]>();
@@ -402,36 +403,32 @@ export default async function AdminDashboard(
       </div>
 
       <Card
-        title="Website traffic — Vercel Analytics"
-        subtitle="The complete visitor dashboard for 123-laundry.com, hosted securely by Vercel."
+        title="Website traffic — private analytics"
+        subtitle="A private customer-safe dashboard for 123-laundry.com, built directly into this admin."
       >
         <div className="rounded-2xl border border-brand-200/20 bg-linear-to-br from-brand/15 via-brand/5 to-transparent p-4 md:p-5">
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-brand-200/25 bg-brand/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-100">
                 <span className="size-2 rounded-full bg-emerald-300" />
-                Official Vercel dashboard
+                First-party admin report
               </div>
               <p className="mt-3 text-sm leading-relaxed text-white/75">
-                See visitors, page views, bounce rate, top pages, referrers,
-                countries, devices, browsers, and operating systems. Change the
-                reporting window, filter to production traffic, and export
-                panel data as CSV.
+                See live visitors, sessions, page views, engagement, top pages,
+                traffic sources, countries, devices, browsers, and operating
+                systems without opening Vercel or seeing any other project.
               </p>
             </div>
-            <a
-              href={VERCEL_ANALYTICS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/admin/website-analytics"
               className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-brand px-5 py-3 text-sm font-bold text-white shadow-lg shadow-brand/20 transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-200"
             >
-              Open website analytics ↗
-            </a>
+              View website traffic →
+            </Link>
           </div>
           <p className="mt-4 border-t border-white/10 pt-3 text-xs leading-relaxed text-white/50">
-            Vercel sign-in is required. Use the email address that was invited
-            as a read-only Viewer; Viewer access cannot change the website or
-            its settings.
+            Uses the existing admin password. Collection starts with this
+            launch; no Google or Vercel account is required.
           </p>
         </div>
       </Card>

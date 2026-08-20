@@ -27,7 +27,8 @@ export default function PrivacyPage() {
       <Section>
         <div className="prose mx-auto max-w-3xl text-ink/80">
           <p>
-            {BUSINESS.legalName} ("we", "us", "our") respects your privacy.
+            {BUSINESS.legalName} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;)
+            respects your privacy.
             This Privacy Policy explains what information we collect when you
             visit our website, use our laundromat services, and use our card
             and text-alert systems.
@@ -46,7 +47,11 @@ export default function PrivacyPage() {
             <li>
               <strong>Usage data on this website.</strong> Standard server
               logs (IP address, browser, page URL) used for security, error
-              tracking, and traffic analysis.
+              tracking, and traffic analysis. Our private first-party analytics
+              records page views, randomly generated visitor and session IDs,
+              referral source, approximate country, and device/browser
+              categories. It does not store IP addresses, names, card numbers,
+              phone numbers, raw user-agent strings, or kiosk information.
             </li>
             <li>
               <strong>Text alert data.</strong> If you opt in, your phone
@@ -66,7 +71,7 @@ export default function PrivacyPage() {
           </ul>
 
           <h2 className="mt-8 font-display text-xl font-bold">
-            What we don't do
+            What we don&apos;t do
           </h2>
           <ul className="mt-3 list-disc pl-6">
             <li>We do not sell your data.</li>
@@ -76,16 +81,17 @@ export default function PrivacyPage() {
 
           <h2 className="mt-8 font-display text-xl font-bold">Cookies</h2>
           <p>
-            Our website may use cookies for basic functionality (e.g., remembering
-            navigation state) and aggregate analytics. You can disable cookies in
-            your browser; the site will still work.
+            Our website may use cookies for basic functionality. The private
+            traffic report uses browser local storage—not an advertising
+            cookie—to remember random visitor and 30-minute session IDs. You can
+            clear or disable browser storage; the site will still work.
           </p>
 
           <h2 className="mt-8 font-display text-xl font-bold">Children</h2>
           <p>
-            We don't knowingly collect personal information from children under 13.
+            We don&apos;t knowingly collect personal information from children under 13.
             If you believe a child has provided us information, contact us and
-            we'll delete it.
+            we&apos;ll delete it.
           </p>
 
           <h2 className="mt-8 font-display text-xl font-bold">Your choices</h2>
@@ -100,7 +106,7 @@ export default function PrivacyPage() {
 
           <h2 className="mt-8 font-display text-xl font-bold">Changes</h2>
           <p>
-            If we change this policy, we'll update the "last updated" date at
+            If we change this policy, we&apos;ll update the &quot;last updated&quot; date at
             the top of this page.
           </p>
 
