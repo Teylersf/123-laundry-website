@@ -5,13 +5,11 @@ import { Suspense } from "react";
 import { db } from "@/lib/db";
 import { requireAdminSessionOrRedirect } from "@/lib/admin-auth";
 import { cachedDashboardQuery } from "@/lib/admin-dashboard-cache";
+import type { LocationSnapshot } from "@/lib/laundrycat";
 import { LOCATION_LIST } from "@/lib/site-data";
 import { parseRange, type ActiveRange } from "./_range";
 import { RangePicker } from "./_range-picker";
-import {
-  HistoricalViewPicker,
-  type HistoricalView,
-} from "./_historical-view-picker";
+import type { HistoricalView } from "./_historical-view-picker";
 import { kv, KV_KEYS } from "@/lib/kv";
 
 export const metadata: Metadata = {
@@ -89,9 +87,8 @@ type UsageRow = {
 };
 
 type PipelineRow = {
-  raw_count: bigint;
-  machine_count: bigint;
-  first_capture: Date | null;
+  location_count: number;
+  machine_count: number;
   last_capture: Date | null;
   current_time: Date;
 };
@@ -105,64 +102,70 @@ function rangeCacheKey(range: ActiveRange): string {
 }
 
 function loadLatestMachines() {
-  return cachedDashboardQuery("admin:latest-machines", 15_000, () =>
-    db.$queryRaw<MachineRow[]>`
-    WITH latest_location_snapshots AS (
-      SELECT DISTINCT ON ("locationSlug")
-        "locationSlug",
-        "snapshotId"
-      FROM location_observations
-      WHERE "locationSlug" IS NOT NULL
-      ORDER BY "locationSlug", "capturedAt" DESC
-    )
-    SELECT
-      m."locationSlug",
-      m."machineNumber",
-      m.kind,
-      m.status,
-      m."rawLabel",
-      m."remainingSeconds",
-      m."endsAt",
-      m."statusTimestamp",
-      m."isOnline",
-      m.rssi,
-      m."errorCode1",
-      m."errorCode2",
-      m."errorCode3",
-      m."isFirmwareUpdatePending",
-      m."firmwareFilename",
-      m."dateAdded",
-      NOW() AS "currentTime"
-    FROM machine_observations m
-    INNER JOIN latest_location_snapshots latest
-      ON latest."snapshotId" = m."snapshotId"
-     AND latest."locationSlug" = m."locationSlug"
-    ORDER BY m."locationSlug", m."machineNumber"
-  `,
-  );
+  return cachedDashboardQuery("admin:latest-machines", 15_000, async () => {
+    const keys = LOCATION_LIST.map((location) => KV_KEYS.snapshot(location.slug));
+    const cached = await db.kvEntry.findMany({
+      where: { key: { in: keys } },
+      select: { key: true, value: true, expiresAt: true },
+    });
+    const now = new Date();
+
+    return cached.flatMap((entry): MachineRow[] => {
+      if (entry.expiresAt && entry.expiresAt <= now) return [];
+      const snapshot = entry.value as LocationSnapshot;
+      const slug = entry.key.slice("lc:snapshot:".length);
+
+      return snapshot.machines.map((machine) => ({
+        locationSlug: slug,
+        machineNumber: machine.id,
+        kind: machine.kind,
+        status: machine.status,
+        rawLabel: machine.rawLabel,
+        remainingSeconds: machine.remainingSeconds,
+        endsAt: machine.endsAt ? new Date(machine.endsAt) : null,
+        statusTimestamp: machine.statusTimestamp
+          ? new Date(machine.statusTimestamp)
+          : null,
+        isOnline: machine.isOnline,
+        rssi: machine.rssi ?? null,
+        errorCode1: machine.errorCode1 ?? null,
+        errorCode2: machine.errorCode2 ?? null,
+        errorCode3: machine.errorCode3 ?? null,
+        isFirmwareUpdatePending: machine.isFirmwareUpdatePending ?? null,
+        firmwareFilename: machine.firmwareFilename ?? null,
+        dateAdded: machine.dateAdded ? new Date(machine.dateAdded) : null,
+        currentTime: now,
+      }));
+    });
+  });
 }
 
 function loadPipeline() {
   return cachedDashboardQuery("admin:pipeline", 30_000, async () => {
-    const rows = await db.$queryRaw<PipelineRow[]>`
-    SELECT
-      GREATEST(COALESCE((
-        SELECT reltuples::bigint FROM pg_class WHERE oid = 'raw_snapshots'::regclass
-      ), 0), 0) AS raw_count,
-      GREATEST(COALESCE((
-        SELECT reltuples::bigint FROM pg_class WHERE oid = 'machine_observations'::regclass
-      ), 0), 0) AS machine_count,
-      (SELECT "capturedAt" FROM raw_snapshots ORDER BY "capturedAt" ASC LIMIT 1) AS first_capture,
-      (SELECT "capturedAt" FROM raw_snapshots ORDER BY "capturedAt" DESC LIMIT 1) AS last_capture,
-      NOW() AS current_time
-    `;
-    return rows[0] ?? {
-      raw_count: BigInt(0),
-      machine_count: BigInt(0),
-      first_capture: null,
-      last_capture: null,
-      current_time: new Date(0),
-    };
+    const keys = [
+      KV_KEYS.lastSyncOk,
+      ...LOCATION_LIST.map((location) => KV_KEYS.snapshot(location.slug)),
+    ];
+    const entries = await db.kvEntry.findMany({
+      where: { key: { in: keys } },
+      select: { key: true, value: true },
+    });
+    const snapshots = entries.filter((entry) =>
+      entry.key.startsWith("lc:snapshot:"),
+    );
+    const lastSync = entries.find((entry) => entry.key === KV_KEYS.lastSyncOk);
+
+    return {
+      location_count: snapshots.length,
+      machine_count: snapshots.reduce(
+        (total, entry) =>
+          total + (entry.value as LocationSnapshot).machines.length,
+        0,
+      ),
+      last_capture:
+        typeof lastSync?.value === "string" ? new Date(lastSync.value) : null,
+      current_time: new Date(),
+    } satisfies PipelineRow;
   });
 }
 
@@ -394,8 +397,8 @@ export default async function AdminDashboard(props: {
           Dashboard
         </h1>
         <p className="mt-2 text-sm text-white/60">
-          The dashboard appears immediately. Live database cards fill in as
-          their data arrives; historical reports run only when requested.
+          The dashboard appears immediately. Live machine status stays current
+          without duplicating LaundryCat&apos;s machine history.
         </p>
       </div>
 
@@ -415,12 +418,6 @@ export default async function AdminDashboard(props: {
       <Suspense fallback={<LiveMachinesSkeleton />}>
         <LiveMachineCards />
       </Suspense>
-
-      <SectionDivider
-        label="Historical analytics · load on request"
-        hint="No historical database query runs until you choose one report below."
-      />
-      <HistoricalViewPicker active={historicalView} />
 
       {historicalView && (
         <>
@@ -490,7 +487,7 @@ async function HomepageDisplayCard() {
   return (
       <Card
         title="Homepage machine display"
-        subtitle="This changes what customers see; collection and history keep running."
+        subtitle="This changes what customers see; live machine updates continue."
       >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <p className="text-sm font-semibold text-white">
@@ -541,19 +538,16 @@ async function PipelineCard() {
   return (
       <Card
         title="Data pipeline"
-        subtitle="Approximate stored-row totals and exact first/last poll times."
+        subtitle="Only the latest live state is stored; LaundryCat keeps machine history."
       >
         <dl className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <PipelineMetric label="Raw polls" value={pipeline.raw_count.toString()} />
-          <PipelineMetric label="Machine rows" value={pipeline.machine_count.toString()} />
+          <PipelineMetric label="Live locations" value={pipeline.location_count.toString()} />
+          <PipelineMetric label="Live machines" value={pipeline.machine_count.toString()} />
           <PipelineMetric
             label="Last poll"
             value={pipeline.last_capture ? `${formatDuration(now - pipeline.last_capture.getTime())} ago` : "—"}
           />
-          <PipelineMetric
-            label="First poll"
-            value={pipeline.first_capture ? pipeline.first_capture.toLocaleString() : "—"}
-          />
+          <PipelineMetric label="Machine history" value="Not stored" />
         </dl>
       </Card>
   );

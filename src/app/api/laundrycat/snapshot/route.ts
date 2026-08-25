@@ -14,11 +14,9 @@
  * header for cross-origin scripts).
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
 import { kv, KV_KEYS } from "@/lib/kv";
 import {
   inferLocationSlug,
-  parseLaundryCatTimestamp,
   snapshotFromJson,
   type LocationSnapshot,
 } from "@/lib/laundrycat";
@@ -105,132 +103,20 @@ export async function POST(req: Request) {
   }> = [];
 
   try {
-    // 1. Archive the entire raw response, then attach every location and
-    //    machine observation to that snapshot row. This preserves the raw
-    //    payload for reprocessing when we add fields later.
-    const rawSnapshot = await db.rawSnapshot.create({
-      data: { payload: raw as object },
-      select: { id: true, capturedAt: true },
-    });
+    // LaundryCat already owns machine history. Keep only the latest state for
+    // each location instead of duplicating every machine on every poll.
+    for (const snapshot of snapshots) {
+      const slug = inferLocationSlug(snapshot.locationLabel);
+      if (!slug) continue;
 
-    // 2. Fan out per-location + per-machine rows from the same raw response.
-    //    We walk the raw payload again (not the normalized `snapshots`) so
-    //    that vending/door companions and any new fields the parser drops
-    //    are still captured 1:1.
-    const rawLocations =
-      (raw as { display_locations?: RawIngestLocation[] }).display_locations ??
-      [];
-
-    for (const rawLoc of rawLocations) {
-      if (rawLoc.is_demo) continue;
-      const slug = inferLocationSlug(rawLoc.location_address ?? "");
-      const parsed = snapshots.find(
-        (s) => s.locationId === (rawLoc.location_id ?? ""),
-      );
-      if (!parsed) continue;
-
-      const otherCount = parsed.machines.filter(
-        (m) => m.kind === "other",
-      ).length;
-
-      await db.locationObservation.create({
-        data: {
-          snapshotId: rawSnapshot.id,
-          capturedAt: rawSnapshot.capturedAt,
-          locationId: rawLoc.location_id ?? "",
-          locationSlug: slug,
-          locationLabel: rawLoc.location_address ?? "",
-          washersAvailable: parsed.washersAvailable,
-          washersTotal: parsed.washersTotal,
-          dryersAvailable: parsed.dryersAvailable,
-          dryersTotal: parsed.dryersTotal,
-          otherCount,
-          websocketSupport:
-            typeof rawLoc.websocket_support === "boolean"
-              ? rawLoc.websocket_support
-              : null,
-        },
+      await storeSnapshot(slug, snapshot);
+      stored.push({
+        slug,
+        label: snapshot.locationLabel,
+        washersAvailable: snapshot.washersAvailable,
+        dryersAvailable: snapshot.dryersAvailable,
+        machineCount: snapshot.machines.length,
       });
-
-      const rawMachines: RawIngestMachine[] = [
-        ...(rawLoc.allWashers ?? []),
-        ...(rawLoc.allDryers ?? []),
-      ];
-      // Look up each parsed machine by ID so we get the same
-      // classification/status logic the UI sees, while still storing the
-      // full raw object.
-      const parsedByNumber = new Map(
-        parsed.machines.map((m) => [m.id, m] as const),
-      );
-
-      if (rawMachines.length > 0) {
-        await db.machineObservation.createMany({
-          data: rawMachines.map((rm) => {
-            const number = (rm.Number ?? "").toUpperCase();
-            const parsedMachine = parsedByNumber.get(number);
-            return {
-              snapshotId: rawSnapshot.id,
-              capturedAt: rawSnapshot.capturedAt,
-              locationId: rawLoc.location_id ?? "",
-              locationSlug: slug,
-              machineNumber: number,
-              kind: parsedMachine?.kind ?? "other",
-              status: parsedMachine?.status ?? "unknown",
-              rawLabel: parsedMachine?.rawLabel ?? rm.display_status ?? "",
-              rawStatusCode:
-                typeof rm.Status === "number" ? rm.Status : null,
-              rawColour: rm.colour ?? null,
-              isOnline: parsedMachine?.isOnline ?? rm.is_online ?? true,
-              showTimer: typeof rm.show_timer === "boolean" ? rm.show_timer : null,
-              remainingSeconds: parsedMachine?.remainingSeconds ?? null,
-              endsAt: parsedMachine?.endsAt
-                ? new Date(parsedMachine.endsAt)
-                : null,
-              machineDbId: bigIntOrNull(rm.id),
-              dateAdded: parseTimestamp(rm.DateAdded),
-              errorCode1: intOrNull(rm.ErrorCode1),
-              errorCode2: intOrNull(rm.ErrorCode2),
-              errorCode3: intOrNull(rm.ErrorCode3),
-              machineSpecificStatusCode1: intOrNull(rm.MachineSpecificStatusCode1),
-              machineSpecificStatusCode2: intOrNull(rm.MachineSpecificStatusCode2),
-              firmwareFilename:
-                typeof rm.FirmwareFilename === "string"
-                  ? rm.FirmwareFilename
-                  : null,
-              isFirmwareUpdatePending:
-                typeof rm.Is_FirmwareUpdatePending === "boolean"
-                  ? rm.Is_FirmwareUpdatePending
-                  : null,
-              lastUpdateSettings: parseTimestamp(rm.Last_Update_Settings),
-              locationKey:
-                typeof rm.Location_Key === "string"
-                  ? rm.Location_Key
-                  : typeof rm.Location_Key === "number"
-                  ? String(rm.Location_Key)
-                  : null,
-              priceCategoryId: intOrNull(rm.Price_Category_Id),
-              readerTechVersionId: intOrNull(rm.reader_tech_version_id),
-              rfidStatus: intOrNull(rm.RFID_Status),
-              rssi: intOrNull(rm.RSSI),
-              seqNo: intOrNull(rm.SeqNo),
-              statusTimestamp: parseTimestamp(rm.Status_Timestamp),
-              payload: rm as object,
-            };
-          }),
-        });
-      }
-
-      // 3. Backwards-compatible KV cache write for the current UI.
-      if (slug) {
-        await storeSnapshot(slug, parsed);
-        stored.push({
-          slug,
-          label: parsed.locationLabel,
-          washersAvailable: parsed.washersAvailable,
-          dryersAvailable: parsed.dryersAvailable,
-          machineCount: parsed.machines.length,
-        });
-      }
     }
 
     await kv.set(KV_KEYS.lastSyncAt, now);
@@ -249,79 +135,6 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, fetchedAt: now, locations: stored }, {
     headers: CORS,
   });
-}
-
-// Minimal duck-typed shapes for the raw LaundryCat payload. Kept local so we
-// don't bleed ingest-layer types into the parsed `Machine`/`LocationSnapshot`
-// API that the rest of the app consumes.
-type RawIngestMachine = {
-  Number?: string;
-  Status?: number;
-  display_status?: string;
-  colour?: string;
-  is_online?: boolean;
-  show_timer?: boolean;
-  RemainingTimeMins?: number;
-  RemainingTimeSecs?: number;
-  id?: unknown;
-  DateAdded?: unknown;
-  ErrorCode1?: unknown;
-  ErrorCode2?: unknown;
-  ErrorCode3?: unknown;
-  MachineSpecificStatusCode1?: unknown;
-  MachineSpecificStatusCode2?: unknown;
-  FirmwareFilename?: unknown;
-  Is_FirmwareUpdatePending?: unknown;
-  Last_Update_Settings?: unknown;
-  Location_Key?: unknown;
-  Price_Category_Id?: unknown;
-  reader_tech_version_id?: unknown;
-  RFID_Status?: unknown;
-  RSSI?: unknown;
-  SeqNo?: unknown;
-  Status_Timestamp?: unknown;
-} & Record<string, unknown>;
-
-type RawIngestLocation = {
-  location_id?: string;
-  location_address?: string;
-  is_demo?: boolean;
-  availableWashers?: number;
-  availableDryers?: number;
-  allWashers?: RawIngestMachine[];
-  allDryers?: RawIngestMachine[];
-  websocket_support?: boolean;
-} & Record<string, unknown>;
-
-function intOrNull(v: unknown): number | null {
-  if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
-  if (typeof v === "string") {
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.trunc(n) : null;
-  }
-  return null;
-}
-
-function bigIntOrNull(v: unknown): bigint | null {
-  if (typeof v === "number" && Number.isFinite(v)) return BigInt(Math.trunc(v));
-  if (typeof v === "bigint") return v;
-  if (typeof v === "string" && /^-?\d+$/.test(v.trim())) {
-    try {
-      return BigInt(v.trim());
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-// Delegate to the shared parser so all naive LaundryCat timestamps get the
-// same Eastern-time interpretation as the countdown math in laundrycat.ts.
-// Rejecting the epoch fallback keeps blank strings out of the DB as bogus
-// 1970 rows.
-function parseTimestamp(v: unknown): Date | null {
-  const d = parseLaundryCatTimestamp(v);
-  return d && d.getTime() !== 0 ? d : null;
 }
 
 async function storeSnapshot(slug: string, snapshot: LocationSnapshot) {

@@ -66,8 +66,9 @@ while their original source value remains visible in the report.
 live-data cards through short-lived, request-coalescing database reads. The
 production Prisma pool intentionally has one connection, so dashboard reads are
 serialized inside each warm server instance instead of competing until they
-time out. Historical rhythm, usage/risk, and error reports are opt-in and do not
-query PostgreSQL until the owner selects the corresponding report button.
+time out. Machine polling keeps only the latest small live snapshot for each
+location; LaundryCat remains the system of record for machine history, usage,
+and repair reports. Website analytics retains its separate first-party history.
 
 ## Getting started
 

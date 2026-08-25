@@ -34,6 +34,15 @@ export type Machine = {
   endsAt: string | null;
   /** True when LaundryCat reports the reader is online. */
   isOnline: boolean;
+  /** Optional diagnostic details retained only in the current live snapshot. */
+  statusTimestamp?: string | null;
+  rssi?: number | null;
+  errorCode1?: number | null;
+  errorCode2?: number | null;
+  errorCode3?: number | null;
+  isFirmwareUpdatePending?: boolean | null;
+  firmwareFilename?: string | null;
+  dateAdded?: string | null;
 };
 
 export type LocationSnapshot = {
@@ -76,6 +85,13 @@ type RawMachine = {
   /** Naive "YYYY-MM-DD HH:MM:SS" in LaundryCat's server timezone (Eastern).
    *  For a busy machine, this is when the current cycle started. */
   Status_Timestamp?: string;
+  RSSI?: number;
+  ErrorCode1?: number;
+  ErrorCode2?: number;
+  ErrorCode3?: number;
+  Is_FirmwareUpdatePending?: boolean;
+  FirmwareFilename?: string;
+  DateAdded?: string;
 };
 
 /**
@@ -216,6 +232,19 @@ function machineFromRaw(raw: RawMachine): Machine {
     remainingSeconds,
     endsAt,
     isOnline,
+    statusTimestamp:
+      parseLaundryCatTimestamp(raw.Status_Timestamp)?.toISOString() ?? null,
+    rssi: typeof raw.RSSI === "number" ? raw.RSSI : null,
+    errorCode1: typeof raw.ErrorCode1 === "number" ? raw.ErrorCode1 : null,
+    errorCode2: typeof raw.ErrorCode2 === "number" ? raw.ErrorCode2 : null,
+    errorCode3: typeof raw.ErrorCode3 === "number" ? raw.ErrorCode3 : null,
+    isFirmwareUpdatePending:
+      typeof raw.Is_FirmwareUpdatePending === "boolean"
+        ? raw.Is_FirmwareUpdatePending
+        : null,
+    firmwareFilename:
+      typeof raw.FirmwareFilename === "string" ? raw.FirmwareFilename : null,
+    dateAdded: parseLaundryCatTimestamp(raw.DateAdded)?.toISOString() ?? null,
   };
 }
 
