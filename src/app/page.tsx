@@ -26,10 +26,18 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const homepageMachineDisplay =
-    (await kv.get<"summary" | "detailed" | "off">(
-      KV_KEYS.homepageMachineDisplay,
-    )) ?? "summary";
+  let homepageMachineDisplay: "summary" | "detailed" | "off" = "summary";
+  try {
+    homepageMachineDisplay =
+      (await kv.get<"summary" | "detailed" | "off">(
+        KV_KEYS.homepageMachineDisplay,
+      )) ?? "summary";
+  } catch (error) {
+    // Machine availability is an enhancement, not a prerequisite for the
+    // public website. Keep serving the homepage when Postgres is unavailable;
+    // the client-side machine API has its own clearly labelled fallback.
+    console.error("[homepage] Could not load machine display preference", error);
+  }
 
   return (
     <>
