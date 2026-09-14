@@ -29,13 +29,13 @@ const STEPS = [
   },
   {
     n: "3",
-    title: "Pick a washer, load, then tap your card",
-    body: "Choose your washer (regular or extra-large), load your clothes, add detergent, and close the door. Then tap your 123 Laundry card on the reader — the machine starts.",
+    title: "Pick a washer, load, then set your 123 Laundry card",
+    body: "Choose your washer (regular or extra-large), load your clothes, add detergent, and close the door. Then set your 123 Laundry card on the reader — the machine starts.",
   },
   {
     n: "4",
-    title: "Move to a dryer, then tap your card",
-    body: "When the wash cycle is done, transfer your load to a dryer and close the door. Then tap your 123 Laundry card on the reader and choose your dry time. Easy.",
+    title: "Move to a dryer, then set your 123 Laundry card",
+    body: "When the wash cycle is done, transfer your load to a dryer and close the door. Then set your 123 Laundry card on the reader and choose your dry time. Easy.",
   },
   {
     n: "5",
