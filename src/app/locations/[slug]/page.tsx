@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import {
   Section,
@@ -112,6 +111,28 @@ export default async function LocationPage(
         <SectionHeading level={1} className="mt-2">
           {loc.name}
         </SectionHeading>
+        <address className="mt-4 not-italic">
+          <a
+            href={loc.googleMaps}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`Get directions to ${loc.name} at ${loc.fullAddress}`}
+            className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-4 py-2 text-base font-semibold text-brand-800 shadow-sm transition hover:border-brand hover:bg-brand-100 sm:text-lg"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="h-5 w-5 shrink-0"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s7-5.1 7-12a7 7 0 1 0-14 0c0 6.9 7 12 7 12Z" />
+              <circle cx="12" cy="9" r="2.5" />
+            </svg>
+            <span>{loc.fullAddress}</span>
+          </a>
+        </address>
         <p className="mt-5 max-w-3xl text-lg text-ink/75">{loc.intro}</p>
         <div className="mt-7 flex flex-wrap gap-3">
           <Button href={loc.googleMaps} external>
@@ -142,7 +163,7 @@ export default async function LocationPage(
         <div className="grid gap-10 md:grid-cols-12">
           <div className="md:col-span-7">
             <div className="overflow-hidden rounded-2xl border border-line">
-              <Image
+              <img
                 src={
                   loc.slug === "deer-park"
                     ? "/images/washer-row.jpg"
@@ -151,7 +172,8 @@ export default async function LocationPage(
                 alt={`Inside ${loc.name} — modern stainless commercial laundry machines`}
                 width={1280}
                 height={1280}
-                sizes="(max-width: 768px) 100vw, 60vw"
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover"
               />
             </div>
@@ -196,7 +218,7 @@ export default async function LocationPage(
             </Card>
 
             <Card className="mt-5">
-              <h2 className="font-display text-xl font-bold">What's here</h2>
+              <h2 className="font-display text-xl font-bold">What&apos;s here</h2>
               <ul className="mt-3 space-y-2 text-sm text-ink/80">
                 {loc.highlights.map((h) => (
                   <li key={h} className="flex gap-2">
