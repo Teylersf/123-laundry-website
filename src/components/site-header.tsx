@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { BUSINESS } from "@/lib/site-data";
+
+const EMPLOYMENT_APPLICATION_URL =
+  "https://jobs.gusto.com/postings/123-laundry-laundromat-laundromat-attendant-4c80c6da-fee2-49b7-a390-4df7dab7ffce";
 
 // Desktop nav — Home is redundant with the top-left logo, so it's omitted
 // there. The mobile menu prepends it so phone visitors have an explicit
@@ -16,8 +18,13 @@ const NAV = [
   { label: "About", href: "/about" },
   { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact" },
+  {
+    label: "Application for employment-Spokane Valley",
+    href: EMPLOYMENT_APPLICATION_URL,
+    external: true,
+  },
 ];
-const MOBILE_NAV = [{ label: "Home", href: "/" }, ...NAV];
+const MOBILE_NAV = [{ label: "Home", href: "/", external: false }, ...NAV];
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -34,33 +41,45 @@ export function SiteHeader() {
           // is a chunky "go home" button.
           className="-my-1.5 -ml-2 flex items-center gap-2 rounded-md p-1 active:bg-brand-50 md:-my-2 md:-ml-1"
         >
-          <Image
+          <img
             src="/images/logo.png"
             alt="123 Laundry logo"
             width={200}
             height={120}
-            priority
+            loading="eager"
+            decoding="async"
             className="h-13 w-auto md:h-15"
           />
           <span className="sr-only">{BUSINESS.name} — home</span>
         </Link>
 
-        <nav aria-label="Primary" className="hidden md:block">
-          <ul className="flex items-center gap-6 text-[15px] font-medium">
+        <nav aria-label="Primary" className="hidden xl:block">
+          <ul className="flex items-center gap-5 text-[15px] font-medium">
             {NAV.map((item) => (
               <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="text-ink hover:text-brand"
-                >
-                  {item.label}
-                </Link>
+                {item.external ? (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-ink hover:text-brand"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link
+                    href={item.href}
+                    className="text-ink hover:text-brand"
+                  >
+                    {item.label}
+                  </Link>
+                )}
               </li>
             ))}
           </ul>
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 xl:flex">
           <a
             href={BUSINESS.cardBalanceUrl}
             target="_blank"
@@ -83,7 +102,7 @@ export function SiteHeader() {
           aria-controls="mobile-nav"
           aria-label="Toggle navigation menu"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line text-ink md:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-line text-ink xl:hidden"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -115,18 +134,30 @@ export function SiteHeader() {
       {open && (
         <div
           id="mobile-nav"
-          className="border-t border-line bg-paper md:hidden"
+          className="border-t border-line bg-paper xl:hidden"
         >
           <ul className="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-3">
             {MOBILE_NAV.map((item) => (
               <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="block rounded-md px-3 py-3 text-base font-medium text-ink hover:bg-brand-50 hover:text-brand"
-                >
-                  {item.label}
-                </Link>
+                {item.external ? (
+                  <a
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-md px-3 py-3 text-base font-medium text-ink hover:bg-brand-50 hover:text-brand"
+                  >
+                    {item.label}
+                  </a>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className="block rounded-md px-3 py-3 text-base font-medium text-ink hover:bg-brand-50 hover:text-brand"
+                  >
+                    {item.label}
+                  </Link>
+                )}
               </li>
             ))}
             <li className="mt-2 grid grid-cols-2 gap-2">
